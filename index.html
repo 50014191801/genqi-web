@@ -1,1 +1,393 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GenQi ·AI 气机分析</title>
+  <meta name="description" content="AI分析，光灸/艾灸。线上咨询 → 线下调理 → 线上复盘的智能闭环。">
+  <style>
+    :root{
+      --fg:#0f172a;--muted:#475569;--soft:#eef6ff;--bg:#f8fafc;--card:#ffffff;--line:#e2e8f0;
+      --brand:#0ea5e9;--ok:#10b981;--warn:#f59e0b;--danger:#ef4444;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial;
+      color:var(--fg);background:linear-gradient(135deg,#eef7ff 0%, #f7fff5 100%);}
+    a{color:var(--brand);text-decoration:none}
+    .wrap{max-width:1000px;margin:0 auto;padding:20px}
+    .hero{padding:60px 16px;text-align:center}
+    .logo{width:72px;height:72px;border-radius:20px;background:#111;color:#fff;
+      display:inline-grid;place-items:center;font-weight:700;font-size:30px;margin-bottom:14px}
+    h1{margin:4px 0 10px;font-size:34px}
+    p.lead{margin:0 auto;color:var(--muted);max-width:760px;line-height:1.7}
+    .grid{display:grid;gap:16px}
+    @media (min-width:980px){ .grid{grid-template-columns:1.1fr .9fr} }
+    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px}
+    .card h3{margin:0 0 10px}
+    .row{display:grid;gap:12px}
+    @media (min-width:640px){ .row{grid-template-columns:1fr 1fr} }
+    label{font-size:14px;color:var(--muted)}
+    input[type="text"],input[type="number"],select,textarea{
+      width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;
+      font-size:14px;outline:none;
+    }
+    textarea{min-height:84px;resize:vertical}
+    .hint{font-size:12px;color:#64748b}
+    .btn{display:inline-flex;gap:8px;align-items:center;border:1px solid var(--line);
+      background:#fff;border-radius:12px;padding:10px 14px;font-weight:600;cursor:pointer}
+    .btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+    .btn.ghost{background:#fff}
+    .btn:disabled{opacity:.6;cursor:not-allowed}
+    .actions{display:flex;flex-wrap:wrap;gap:10px}
+    .report{white-space:pre-wrap;line-height:1.7}
+    .tag{display:inline-block;padding:4px 8px;border-radius:999px;border:1px solid var(--line);
+      background:#f8fafc;font-size:12px;margin:0 6px 6px 0}
+    .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;
+      font-size:12px;background:#ecfeff;color:#0369a1;border:1px solid #ccefff;margin-right:6px}
+    .ok{color:var(--ok)} .warn{color:var(--warn)} .danger{color:var(--danger)}
+    .foot{padding:30px 0 60px;text-align:center;color:var(--muted);font-size:13px}
+    .sep{height:1px;background:var(--line);margin:14px 0}
+    .small{font-size:12px;color:var(--muted)}
+    .list{margin:0;padding-left:18px}
+    .list li{margin:6px 0}
+    .empty{opacity:.5}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <div class="logo">Qi</div>
+      <h1>GenQi · AI 气机分析</h1>
+      <p class="lead">AI 做分析，光灸/艾灸。先用网页生成你的轻症调理建议，再一键预约最近门店，形成“线上咨询 → 线下调理 → 线上复盘”的闭环。</p>
+    </header>
 
+    <main class="grid">
+      <!-- 左：咨询表单 -->
+      <section class="card">
+        <h3>✍️ 轻症咨询表单</h3>
+        <div class="row">
+          <div>
+            <label>主诉（最困扰你的问题）</label>
+            <input id="chief" type="text" placeholder="例如：入睡困难、胃胀、容易焦虑…" />
+          </div>
+          <div>
+            <label>最近 3 天体感</label>
+            <select id="feel">
+              <option value="">请选择</option>
+              <option>状态好</option><option>有点累</option><option>睡得差</option>
+              <option>胃胀/食少</option><option>焦虑烦躁</option>
+              <option>颈肩僵硬/畏寒</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label>精力（1-10）</label>
+            <input id="energy" type="number" min="1" max="10" value="6" />
+          </div>
+          <div>
+            <label>夜间睡眠时长（小时）</label>
+            <input id="sleep" type="number" min="0" max="14" value="7" />
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label>情绪压力</label>
+            <select id="stress">
+              <option value="">请选择</option>
+              <option>低</option><option>中</option><option>高</option>
+            </select>
+          </div>
+          <div>
+            <label>手脚温度</label>
+            <select id="temp">
+              <option value="">请选择</option>
+              <option>偏冷</option><option>正常</option><option>偏热</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label>消化</label>
+            <select id="dig">
+              <option value="">请选择</option>
+              <option>良好</option><option>易胀/食少</option><option>便溏/稀</option>
+              <option>嗳气/反酸</option>
+            </select>
+          </div>
+          <div>
+            <label>口渴/喜冷饮</label>
+            <select id="thirst">
+              <option value="">无明显</option>
+              <option>口干喜凉饮</option>
+              <option>口不渴/喜温饮</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label>女性经期（如适用）</label>
+            <select id="menses">
+              <option value="">不适用/正常</option>
+              <option>少量/颜色淡</option>
+              <option>血块多/痛经</option>
+            </select>
+            <div class="hint">男性或不适用可忽略</div>
+          </div>
+          <div>
+            <label>舌象（文字描述即可）</label>
+            <input id="tongue" type="text" placeholder="例如：淡胖有齿痕/红少津/苔厚腻…" />
+          </div>
+        </div>
+
+        <div>
+          <label>其它补充（可选）</label>
+          <textarea id="other" placeholder="想补充的情况都可以写在这里…"></textarea>
+        </div>
+
+        <div class="actions" style="margin-top:12px">
+          <button id="run" class="btn primary">⚡ 生成气机报告</button>
+          <button id="reset" class="btn ghost" type="button">清空</button>
+          <span class="small">结果仅用于**亚健康/轻症**自我调理参考，不作为医疗诊断。</span>
+        </div>
+      </section>
+
+      <!-- 右：报告区 -->
+      <section class="card">
+        <h3>📄 分析报告</h3>
+        <div id="tags"></div>
+        <div class="sep"></div>
+        <div id="report" class="report empty">填写左侧表单，点击「生成气机报告」。</div>
+        <div class="sep"></div>
+        <div class="actions">
+          <button id="copy" class="btn">复制报告</button>
+          <a id="book" class="btn" href="mailto:hello@genqi.vip?subject=预约到店体验&body=我想预约线下体验，请与我联系。" target="_blank">邮件预约</a>
+          <a id="wa" class="btn" href="https://wa.me/00000000000?text=%E6%88%91%E6%83%B3%E9%A2%84%E7%BA%A6GenQi%E7%BA%BF%E4%B8%8B%E4%BD%93%E9%AA%8C" target="_blank">WhatsApp</a>
+        </div>
+        <div class="sep"></div>
+        <div>
+          <h4 style="margin:0 0 6px">🕘 最近记录</h4>
+          <div id="history" class="small"></div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="foot">
+      GenQi · 轻资产高复购的 AI+光灸/艾灸闭环 &nbsp;·&nbsp; <a href="mailto:hello@genqi.vip">商务合作</a>
+    </footer>
+  </div>
+
+  <script>
+    // 评分与标签
+    function analyze(inputs){
+      const score = { qi:0, blood:0, yin:0, yang:0, liver:0, damp:0 };
+
+      // 主诉关键词轻权重
+      const chief = (inputs.chief||'').toLowerCase();
+      if(/乏力|疲|气短|懒言|出汗/.test(chief)) score.qi+=1;
+      if(/头晕|面色淡|心悸/.test(chief)) score.blood+=1;
+      if(/口干|盗汗|失眠/.test(chief)) score.yin+=1;
+      if(/畏寒|四肢冷|腰膝冷/.test(chief)) score.yang+=1;
+      if(/胸闷|焦虑|易怒|胁痛|郁/.test(chief)) score.liver+=1;
+      if(/腹胀|困重|粘滞|痰多/.test(chief)) score.damp+=1;
+
+      // 精力与睡眠
+      const energy = Number(inputs.energy||6);
+      if(energy<=4) score.qi+=2;
+      if(energy>=8) score.qi-=1;
+      const sleep = Number(inputs.sleep||7);
+      if(sleep<6) score.yin+=2;
+      if(sleep>9) score.damp+=1;
+
+      // 压力、情绪
+      if(inputs.stress==='高') score.liver+=2;
+      if(inputs.stress==='中') score.liver+=1;
+
+      // 手脚温度
+      if(inputs.temp==='偏冷') score.yang+=2;
+      if(inputs.temp==='偏热') score.yin+=1;
+
+      // 消化
+      if(inputs.dig==='易胀/食少') { score.qi+=1; score.liver+=1; score.damp+=1; }
+      if(inputs.dig==='便溏/稀') { score.yang+=2; score.damp+=2; }
+      if(inputs.dig==='嗳气/反酸') score.liver+=1;
+
+      // 口渴/喜饮
+      if(inputs.thirst==='口干喜凉饮') score.yin+=2;
+      if(inputs.thirst==='口不渴/喜温饮') score.yang+=1;
+
+      // 经期
+      if(inputs.menses==='少量/颜色淡'){ score.qi+=1; score.blood+=2; }
+      if(inputs.menses==='血块多/痛经'){ score.liver+=2; }
+
+      // 舌象粗略
+      const tg = (inputs.tongue||'');
+      if(/淡|胖|齿痕/.test(tg)) { score.qi+=1; score.damp+=2; }
+      if(/红|少津/.test(tg)) score.yin+=2;
+      if(/紫|瘀点/.test(tg)) score.liver+=1;
+      if(/苔厚腻|腻/.test(tg)) score.damp+=2;
+
+      // 体感
+      switch(inputs.feel){
+        case '有点累': score.qi+=1; break;
+        case '睡得差': score.yin+=2; break;
+        case '胃胀/食少': score.damp+=1; score.liver+=1; break;
+        case '焦虑烦躁': score.liver+=2; break;
+        case '颈肩僵硬/畏寒': score.liver+=1; score.yang+=1; break;
+      }
+
+      // 体质判定（取Top 2）
+      const pairs = Object.entries(score).sort((a,b)=>b[1]-a[1]);
+      const top = pairs.filter(p=>p[1]>0).slice(0,2).map(p=>p[0]);
+      const map = {
+        qi:'气虚', blood:'血虚', yin:'阴虚', yang:'阳虚', liver:'肝郁', damp:'脾湿'
+      };
+      const labels = top.length? top.map(k=>map[k]) : ['平衡'];
+      return {score, labels, top};
+    }
+
+    function planFor(key){
+      // 光灸/艾灸方案 & 生活建议（可继续打磨）
+      const dict = {
+        qi:{
+          title:'气虚调理',
+          points:'中脘、气海、足三里、脾俞',
+          light:'红外/温热 20–25 分钟，2–3 次/周',
+          diet:'粥汤类、山药/小米/红枣；少冷饮',
+          life:'23:00前休息，日间轻度出汗运动'
+        },
+        blood:{
+          title:'血虚养血',
+          points:'肝俞、膈俞、三阴交、血海',
+          light:'红外温热 20 分钟，2 次/周',
+          diet:'黑芝麻、枸杞、红枣、当归鸡汤',
+          life:'少熬夜，午后做 10 分钟放松呼吸'
+        },
+        yin:{
+          title:'阴虚养阴',
+          points:'太溪、阴陵泉、照海、肾俞',
+          light:'温和 15–20 分钟，避强热',
+          diet:'百合银耳汤、梨、芝麻糊；少辛辣',
+          life:'晚间减少蓝光暴露，助眠拉伸'
+        },
+        yang:{
+          title:'阳虚温阳',
+          points:'命门、关元、足三里、肾俞',
+          light:'偏热 20–25 分钟，3 次/周',
+          diet:'生姜红糖水、羊肉/牛肉；忌冷生',
+          life:'温足泡脚 10–15 分钟'
+        },
+        liver:{
+          title:'肝郁疏调',
+          points:'太冲、肝俞、内关、期门',
+          light:'中温 15–20 分钟',
+          diet:'玫瑰花茶、陈皮；少咖啡与酒精',
+          life:'快走/拉伸，情绪书写与冥想'
+        },
+        damp:{
+          title:'脾湿化湿',
+          points:'中脘、阴陵泉、丰隆、脾俞',
+          light:'中温 20 分钟，2–3 次/周',
+          diet:'薏米、茯苓、山药；少甜腻与宵夜',
+          life:'餐后 15 分钟散步，体重管理'
+        }
+      };
+      return dict[key];
+    }
+
+    // 生成报告
+    function gen(){
+      const val = id=>document.getElementById(id).value.trim();
+      const inputs = {
+        chief:val('chief'), feel:val('feel'), energy:val('energy'), sleep:val('sleep'),
+        stress:val('stress'), temp:val('temp'), dig:val('dig'),
+        thirst:val('thirst'), menses:val('menses'), tongue:val('tongue'), other:val('other')
+      };
+      const res = analyze(inputs);
+
+      // 标签
+      const tagBox = document.getElementById('tags');
+      tagBox.innerHTML = '';
+      res.labels.forEach(t=>{
+        const s = document.createElement('span'); s.className='pill'; s.textContent=t; tagBox.appendChild(s);
+      });
+      if(!res.labels.length){ tagBox.innerHTML='<span class="small">状态整体平衡</span>'; }
+
+      // 方案
+      let plans = '';
+      if(res.top.length){
+        res.top.forEach(k=>{
+          const p = planFor(k);
+          if(!p) return;
+          plans += `\n【${p.title}】\n· 光灸/艾灸：${p.points}\n· 建议：${p.light}\n· 饮食：${p.diet}\n· 生活：${p.life}\n`;
+        });
+      }else{
+        plans = '\n保持作息与规律运动，维持当前良好状态即可。';
+      }
+
+      // 汇总文本
+      const summary = 
+`【气机画像】${res.labels.join(' + ') || '平衡'}
+【主诉】${inputs.chief || '（未填写）'}
+【体感】${inputs.feel || '（未填写）'}｜精力${inputs.energy||'-'}/10｜睡眠${inputs.sleep||'-'}h｜情绪${inputs.stress||'-'}｜手脚${inputs.temp||'-'}
+【消化】${inputs.dig || '-'}｜口渴/饮偏好：${inputs.thirst||'-'}｜经期：${inputs.menses||'-'}
+【舌象】${inputs.tongue || '-'}
+${inputs.other? '【补充】'+inputs.other+'\n':''}
+——— 调理方案 ———
+${plans}
+【到店建议】首次做 1 次综合调理（30–40 分钟），随后每周 2–3 次，共 2–4 周观察复购效果。
+【声明】本报告仅用于亚健康/轻症的日常调理，不替代医疗诊断。`;
+
+      const box = document.getElementById('report');
+      box.textContent = summary;
+      box.classList.remove('empty');
+
+      // 存本地历史（最多5条）
+      const history = JSON.parse(localStorage.getItem('genqi_history')||'[]');
+      const item = { t:Date.now(), labels:res.labels, chief:inputs.chief, text:summary };
+      history.unshift(item); const sliced = history.slice(0,5);
+      localStorage.setItem('genqi_history', JSON.stringify(sliced));
+      renderHistory();
+    }
+
+    function renderHistory(){
+      const holder = document.getElementById('history');
+      const history = JSON.parse(localStorage.getItem('genqi_history')||'[]');
+      if(!history.length){ holder.innerHTML = '<span class="small">暂无记录</span>'; return; }
+      holder.innerHTML = history.map(h=>{
+        const dt = new Date(h.t); 
+        const time = dt.toLocaleString();
+        const tags = (h.labels||[]).join('+')||'平衡';
+        return `<div class="tag">${time}｜${tags}｜${(h.chief||'无主诉').slice(0,20)}</div>`;
+      }).join(' ');
+    }
+
+    function copyReport(){
+      const text = document.getElementById('report').textContent || '';
+      if(!text.trim()){ alert('还没有报告'); return; }
+      navigator.clipboard.writeText(text).then(()=>alert('已复制到剪贴板'));
+    }
+
+    function resetForm(){
+      ['chief','feel','energy','sleep','stress','temp','dig','thirst','menses','tongue','other']
+        .forEach(id=>document.getElementById(id).value='');
+      document.getElementById('energy').value=6;
+      document.getElementById('sleep').value=7;
+      document.getElementById('report').textContent='填写左侧表单，点击「生成气机报告」。';
+      document.getElementById('report').classList.add('empty');
+      document.getElementById('tags').innerHTML='';
+    }
+
+    // 事件绑定
+    document.getElementById('run').addEventListener('click', gen);
+    document.getElementById('copy').addEventListener('click', copyReport);
+    document.getElementById('reset').addEventListener('click', resetForm);
+    renderHistory();
+  </script>
+</body>
+</html>
