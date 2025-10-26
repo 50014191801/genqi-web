@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>GenQi Pro · 艾灸馆智能接诊系统</title>
-  <meta name="description" content="客户症状录入 → 自动生成辩证与布火建议 → 一键发送门店WhatsApp接诊。" />
+  <meta name="description" content="客户症状录入 → 自动生成辩证与气机分层布火建议（含妇科/男性科/老年病科专项） → 一键发送门店 WhatsApp 接诊。" />
   <meta name="theme-color" content="#0ea5e9" />
   <style>
     :root{
@@ -37,7 +37,7 @@
     label{font-size:13px;color:#475569}
     input,select,textarea{
       width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:12px;
-      outline:none;background:#fff;color:var(--fg);
+      outline:none;background:#fff;color:#fg;
     }
     textarea{min-height:88px;resize:vertical}
     input:focus,select:focus,textarea:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(14,165,233,.15)}
@@ -64,7 +64,7 @@
       <div class="qi">Qi</div>
       <div>
         <h1>GenQi Pro · 艾灸馆智能接诊系统</h1>
-        <div class="subtitle">客户输入症状 → 自动生成辩证与布火建议 → 一键发送门店接诊</div>
+        <div class="subtitle">客户输入症状 → 自动生成辩证与气机分层布火建议（含妇科/男性科/老年病科专项） → 一键发送门店接诊</div>
       </div>
     </div>
 
@@ -78,7 +78,7 @@
 
       <div class="full">
         <label>主诉（最困扰的问题）</label>
-        <input id="chief" placeholder="例：睡不着、胃胀、月经不调…" />
+        <input id="chief" placeholder="例：睡不着、胃胀、月经不调、夜尿频、膝痛…" />
       </div>
 
       <div class="row">
@@ -134,19 +134,19 @@
           <label>女性经期（如适用）</label>
           <select id="menses">
             <option selected>不适用/正常</option><option>疼痛</option><option>提前</option>
-            <option>延后</option><option>量多</option><option>量少</option>
+            <option>延后</option><option>量多</option><option>量少</option><option>闭经</option>
           </select>
         </div>
       </div>
 
       <div class="full">
         <label>舌象/咽喉/皮肤等（可选）</label>
-        <input id="tongue" placeholder="例：舌淡、苔白厚；咽干、口苦…" />
+        <input id="tongue" placeholder="例：舌淡、苔白厚；舌红苔黄；瘀点；厚腻…" />
       </div>
 
       <div class="full">
         <label>其他补充（可选）</label>
-        <textarea id="other" placeholder="任何有助判断的信息…"></textarea>
+        <textarea id="other" placeholder="例：更年期潮热盗汗；痛经；带下异常；夜尿频；阳痿早泄；膝痛；眩晕耳鸣等…"></textarea>
       </div>
 
       <div class="btns">
@@ -160,196 +160,241 @@
     </div>
 
     <div class="footer">
-      © 2025 GenQi Pro · 专业艾灸馆接诊系统。所有内容仅供健康调理参考。
+      © 2025 GenQi Pro · 专业艾灸馆接诊系统。所有内容仅供健康调理参考；出现紧急症状请立即就医。
     </div>
   </div>
 
+  <!-- ======= 脚本开始 ======= -->
   <script>
-    /* ====== 基础DOM ====== */
+    /* =====================================================
+       [行 300] 基础常量与按钮
+       ===================================================== */
     const $ = s => document.querySelector(s);
     const btn = $("#send");
     const resetBtn = $("#reset");
     const notice = $("#success");
 
-    /* ====== 门店联系方式（按你当前已在用的配置，不改）====== */
-    const storeEmail = "borneonmoxa@gmail.com"; // 邮件备份可用，可留空
-    const storeWA    = "60109732328";           // WhatsApp：国家码+号码（无0/+/空格/-）
+    // ⚠️ 保持与你现在一致：WhatsApp & 邮件配置不改
+    const storeEmail = "borneonmoxa@gmail.com"; // 可留空
+    const storeWA    = "60109732328";           // 国际格式，无 + / 0 / 空格 / -
 
-    /* ====== 辩证：中文证型名 & 格式化 ====== */
-const PATTERN_CN = {
-  yangXu: "阳虚",
-  yinXu:  "阴虚",
-  qiZhi:  "气滞",
-  shiRe:  "湿热",
-  piXu:   "脾虚",
-  mixed:  "兼证",
-  "综合/未定型": "综合/未定型"
-};
+    /* =====================================================
+       [行 320] 证型中文映射 & 展示格式化
+       ===================================================== */
+    const PATTERN_CN = {
+      yangXu: "阳虚", yinXu: "阴虚", qiZhi: "气滞", shiRe: "湿热", piXu: "脾虚",
+      tanShi: "痰湿", xueYu: "血瘀", qiXueLiangXu: "气血两虚", ganShenLiangXu: "肝肾两虚",
+      weiReShiJi: "胃热食积", "综合/未定型": "综合/未定型"
+    };
+    function cnCode(code){ return PATTERN_CN[code] || code; }
+    function formatPattern(mainCode, secondCode){
+      if(!mainCode) return PATTERN_CN["综合/未定型"];
+      if(secondCode) return `${cnCode(mainCode)}（兼${cnCode(secondCode)}）`;
+      return cnCode(mainCode);
+    }
 
-function cnCode(code){ return PATTERN_CN[code] || code; }
+    /* =====================================================
+       [行 350] 证型规则库（10 类）+ 气机分层模板
+       ===================================================== */
+    const RULES = {
+      yangXu: { keys:["怕冷","畏寒","手脚冷","喜热","乏力","尿清长","四肢发凉","畏风"],
+        base:["关元","命门","气海","足三里"], plus:["肾俞","中极"], assist:["隔姜灸 / 温和艾条"], intensity:"中灸", focus:"下焦" },
+      yinXu: { keys:["盗汗","口干","舌红","心烦","失眠","夜汗","五心烦热","潮热"],
+        base:["三阴交","太溪","神门"], plus:["涌泉","照海"], assist:["减量灸 / 间歇灸"], intensity:"浅灸", focus:"上焦" },
+      qiZhi: { keys:["胸闷","胀","嗳气","烦闷","情绪","易怒","咽喉异物感","两胁胀痛"],
+        base:["膻中","中脘","太冲"], plus:["期门","行间"], assist:["顺气手法配合灸"], intensity:"中灸", focus:"上焦" },
+      shiRe: { keys:["口苦","便秘","小便黄","痤疮","苔黄腻","口干","腹胀粘滞","大便干结","体臭重"],
+        base:["阴陵泉","曲池","足三里","丰隆"], plus:["内庭","合谷"], assist:["以清为主，短时多次"], intensity:"浅灸", focus:"中焦" },
+      piXu: { keys:["食少","腹胀","乏力","面色萎黄","大便稀","腹泻","纳差","嗜睡","易疲劳"],
+        base:["中脘","足三里","脾俞"], plus:["气海","三阴交"], assist:["轻柔留灸，时间适中"], intensity:"中灸", focus:"中焦" },
+      tanShi: { keys:["痰多","咳痰","胸闷痰鸣","苔厚腻","体形肥胖","困重","眩晕痰上扰"],
+        base:["丰隆","中脘","阴陵泉"], plus:["肺俞","列缺"], assist:["化痰为主，可配合走罐"], intensity:"中灸", focus:"中上焦" },
+      xueYu: { keys:["刺痛","固定痛","痛经瘀块","身上瘀斑","面暗沉","舌有瘀点","胸痹"],
+        base:["血海","膈俞","三阴交"], plus:["太冲","内关"], assist:["活血化瘀，手法配合"], intensity:"中灸", focus:"上中焦" },
+      qiXueLiangXu: { keys:["面色萎黄","心悸气短","头晕","乏力","爪甲淡白","月经量少"],
+        base:["气海","关元","足三里","脾俞"], plus:["膻中","百会"], assist:["温补为主，可配合艾饼"], intensity:"中灸", focus:"中下焦" },
+      ganShenLiangXu: { keys:["腰膝酸软","头晕耳鸣","失眠多梦","目干涩","阳痿","脱发"],
+        base:["肝俞","肾俞","太溪","三阴交"], plus:["关元","太冲"], assist:["滋补肝肾，量宜渐进"], intensity:"浅-中灸", focus:"下焦" },
+      weiReShiJi: { keys:["口渴喜冷","口臭","胃脘灼热","多食易饥","大便干","舌红苔黄","嗳腐吞酸"],
+        base:["内庭","梁丘","中脘","天枢"], plus:["合谷","曲池"], assist:["清胃泄热，慎温"], intensity:"浅灸", focus:"中焦" }
+    };
 
-/** 把内部编码组合成中文展示：主证（兼 次证） */
-function formatPattern(mainCode, secondCode){
-  if(!mainCode) return PATTERN_CN["综合/未定型"];
-  if(secondCode) return `${cnCode(mainCode)}（兼${cnCode(secondCode)}）`;
-  return cnCode(mainCode);
-}
+    // 气机分层模板（焦域 → 补充原则）
+    const QI_LAYERS = {
+      "上焦": { open:["膻中","天突"], descend:["天突","内关"], note:"宣发肃降，情志调畅" },
+      "中焦": { harmonize:["中脘","天枢","脾俞"], move:["太冲","合谷"], note:"健运脾胃，升清降浊" },
+      "下焦": { warm:["关元","中极"], root:["命门","肾俞"], note:"温养冲任，培补下元" },
+      "中上焦": { open:["膻中"], transform:["丰隆","阴陵泉"], note:"化痰宽中，开阖调机" },
+      "上中焦": { move:["膻中","太冲"], blood:["血海","膈俞"], note:"行气活血，通滞止痛" },
+      "中下焦": { tonify:["气海","关元"], harmonize:["中脘","脾俞"], note:"补益气血，统摄升降" }
+    };
 
-/* ====== 辩证与布火（主证/兼证 + 基础/强化/辅助 + 强度 + 时长频次）====== */
-function suggestPoints(v) {
-  // 收集文本信号（统一小写，避免奇怪空格）
-  const raw = [
-    v.chief, v.feel, v.digestion, v.limbTemp, v.thirst,
-    v.tongue, v.other, v.menses
-  ].join(" ");
-  const text = (raw || "").toLowerCase().replace(/\u00A0/g, " "); // 去除不间断空格
+    /* =====================================================
+       [行 430] 三大专项：妇科 / 男性科 / 老年病科（叠加规则）
+       ===================================================== */
+    // 命中专项关键词时，额外叠加加点与说明（不会取代证型，只是“加号包”）
+    const SPECIAL = [
+      {
+        name: "妇科（经期/带下/更年期）",
+        trigger: /(痛经|经痛|月经不调|提前|延后|量多|量少|闭经|带下|更年期|潮热|盗汗)/,
+        addPoints: ["三阴交","关元","子宫","中极","太冲"],
+        note: "调冲任、理肝郁；行气活血与温养相配。经期剧痛可加血海；更年期潮热偏阴虚者酌加太溪。"
+      },
+      {
+        name: "男性科（肾阳/前列腺/性功能）",
+        trigger: /(阳痿|早泄|不育|前列腺|夜尿|尿频|性欲低|滑精)/,
+        addPoints: ["关元","命门","肾俞","中极","太溪","会阴"],
+        note: "温肾固本，佐以下焦固摄；小便频数兼涩痛者，可加三阴交与水道。"
+      },
+      {
+        name: "老年病科（睡眠/便秘/关节/眩晕）",
+        trigger: /(失眠|多梦|健忘|便秘|膝痛|关节|骨关节|眩晕|耳鸣|气短|乏力|步态不稳)/,
+        addPoints: ["神门","安眠","百会","天枢","大肠俞","膝眼","阳陵泉","风池","太冲"],
+        note: "宁神、通便、舒筋与清窍并举；个别患者体虚不耐久灸，时长与强度宜从轻到中。"
+      }
+    ];
 
-  // 紧急禁灸信号（出现任何即禁灸）
-  const redFlags = ["胸痛","呼吸困难","高热","晕厥","严重出血"];
-  for (const rf of redFlags) {
-    if (text.includes(rf.toLowerCase())) {
+    /* =====================================================
+       [行 470] 打分引擎 + 强度自动微调 + 专项叠加
+       ===================================================== */
+    function scoreAndSuggest(v){
+      // 1) 文本池
+      const raw = [v.chief, v.feel, v.digestion, v.limbTemp, v.thirst, v.tongue, v.other, v.menses].join(" ");
+      const text = (raw || "").toLowerCase().replace(/\u00A0/g, " ");
+
+      // 2) 紧急禁灸（出现即返回）
+      const redFlags = ["胸痛","呼吸困难","高热","晕厥","严重出血"];
+      for (const rf of redFlags){
+        if (text.includes(rf.toLowerCase())){
+          return {
+            main:null, second:null, mixed:false,
+            primary:[], secondary:[], assist:[],
+            intensity:"禁灸", timePerPointMin:0, sessionMinutes:0,
+            frequency:"立即就医，暂停灸疗", qiLayerNote:"——",
+            note:`出现紧急信号（${rf}），请第一时间就医。`,
+            specials:[]
+          };
+        }
+      }
+
+      // 3) 证型打分
+      const scores = {};
+      Object.keys(RULES).forEach(key=>{
+        let s = 0; const r = RULES[key];
+        r.keys.forEach(kw=>{ if (text.includes(kw.toLowerCase())) s += 1; });
+
+        // 结构化加权
+        if (key==="yangXu" && /冷|畏寒|偏冷/.test(v.limbTemp||"")) s += 1;
+        if (key==="yinXu"  && /口干|盗汗|潮热/.test((v.thirst||"") + " " + (v.other||""))) s += 1;
+        if (key==="qiZhi"  && /(胸闷|烦闷|易怒)/.test(v.feel||"")) s += 1;
+        if (key==="shiRe"  && /(口苦|苔黄|小便黄)/.test((v.tongue||"") + " " + (v.digestion||""))) s += 1;
+        if (key==="piXu"   && /(腹胀|食少|大便稀|腹泻)/.test(v.digestion||"")) s += 1;
+        if (key==="tanShi" && /(苔厚腻|痰|困重)/.test((v.tongue||"") + " " + (v.feel||""))) s += 1;
+        if (key==="xueYu"  && /(刺痛|固定痛|瘀|瘀点)/.test((v.chief||"") + " " + (v.tongue||""))) s += 1;
+        if (key==="qiXueLiangXu" && /(面色萎黄|头晕|量少)/.test((v.chief||"") + " " + (v.menses||""))) s += 1;
+        if (key==="ganShenLiangXu" && /(腰膝酸软|耳鸣|脱发|多梦)/.test((v.other||"") + " " + (v.feel||""))) s += 1;
+        if (key==="weiReShiJi" && /(口臭|吞酸|灼热|大便干)/.test((v.chief||"") + " " + (v.digestion||""))) s += 1;
+
+        scores[key] = s;
+      });
+
+      const sorted = Object.entries(scores).sort((a,b)=>b[1]-a[1]);
+      const [top, second] = [sorted[0], sorted[1]];
+
+      // 4) 基础建议（若无明显证型）
+      if (!top || top[1]===0){
+        const L = QI_LAYERS["中焦"];
+        return {
+          main:null, second:null, mixed:false,
+          primary:["中脘","关元","足三里"], secondary:["脾俞"], assist:["基础布阵，30分钟后复查"],
+          intensity:"中灸", timePerPointMin:8, sessionMinutes:25,
+          frequency:"每周 2-3 次，10-12 次为一疗程", qiLayerNote:L.note,
+          note:"无明显单一证型，建议先做中焦与下焦基础位，观察再调。",
+          specials:matchSpecials(text)
+        };
+      }
+
+      const mainKey = top[0];
+      const secondKey = (second && (top[1]-second[1] <= 1)) ? second[0] : null;
+      const main = RULES[mainKey];
+
+      // 5) 强度按精力/压力微调
+      let intensity = main.intensity; // 可能是“浅-中灸”
+      const energy = Number(v.energy || 6);
+      const stress = String(v.stress || "中");
+      if (intensity.includes("浅-中")) intensity = (energy>=7 ? "中灸" : "浅灸");
+      if (energy <=4 && intensity==="中灸") intensity = "浅灸";
+      if (energy >=9 && intensity==="中灸" && stress==="低") intensity = "深灸";
+
+      const TIME = { "浅灸":{per:6,session:18}, "中灸":{per:8,session:25}, "深灸":{per:10,session:30} };
+      const t = TIME[intensity] || TIME["中灸"];
+
+      // 6) 气机分层提示
+      const layerKey = main.focus || "中焦";
+      const layer = QI_LAYERS[layerKey] || { note:"调和气机" };
+
+      // 7) 三大专项叠加
+      const specials = matchSpecials(text);
+
+      // 8) 合并“专项加点”（不覆盖主阵，只叠加）
+      const addFromSpecials = specials.flatMap(s => s.addPoints);
+      const mergedPrimary = Array.from(new Set([...main.base]));
+      const mergedSecondary = Array.from(new Set([...main.plus]));
+      const mergedAssist = Array.from(new Set([...main.assist, ...addFromSpecials]));
+
       return {
-        main: null, second: null, mixed: false,
-        primary: [], secondary: [], assist: [],
-        intensity: "禁灸",
-        timePerPointMin: 0,
-        sessionMinutes: 0,
-        frequency: "立即就医，暂停灸疗",
-        note: `出现紧急信号（${rf}），请第一时间就医。`
+        main:mainKey, second:secondKey, mixed:!!secondKey,
+        primary:mergedPrimary, secondary:mergedSecondary, assist:mergedAssist,
+        intensity:intensity, timePerPointMin:t.per, sessionMinutes:t.session,
+        frequency:"每周 2-3 次，10-12 次为一疗程；缓解后维持 1 次/周",
+        qiLayerNote: layer.note,
+        note: secondKey ? `主：${cnCode(mainKey)}；兼：${cnCode(secondKey)}。可兼顾兼证要点。`
+                        : `以 ${cnCode(mainKey)} 为主进行灸疗。`,
+        specials
       };
     }
-  }
 
-  // 证型规则库
-  const patterns = {
-    yangXu: { // 阳虚
-      keys: ["怕冷","畏寒","手脚冷","喜热","乏力","尿清长","四肢发凉","畏风"],
-      primary:   ["关元","命门","气海","足三里"],
-      secondary: ["肾俞","中极"],
-      assist:    ["隔姜灸 / 温和艾条"],
-      defaultIntensity: "中灸"
-    },
-    yinXu: {  // 阴虚
-      keys: ["盗汗","口干","舌红","心烦","失眠","夜汗","手足心热","五心烦热"],
-      primary:   ["三阴交","太溪","神门"],
-      secondary: ["涌泉","照海"],
-      assist:    ["减量灸 / 间歇灸"],
-      defaultIntensity: "浅灸"
-    },
-    qiZhi: {  // 气滞
-      keys: ["胸闷","胀","嗳气","烦闷","情绪","易怒","咽喉异物感"],
-      primary:   ["膻中","中脘","太冲"],
-      secondary: ["期门","行间"],
-      assist:    ["顺气手法配合灸"],
-      defaultIntensity: "中灸"
-    },
-    shiRe: {  // 湿热
-      keys: ["口苦","便秘","小便黄","痤疮","苔黄腻","口干","腹胀粘滞","大便干结"],
-      primary:   ["阴陵泉","曲池","足三里","丰隆"],
-      secondary: ["内庭","合谷"],
-      assist:    ["以清为主，短时多次"],
-      defaultIntensity: "浅灸"
-    },
-    piXu: {   // 脾虚
-      keys: ["食少","腹胀","乏力","面色萎黄","大便稀","腹泻","纳差","嗜睡"],
-      primary:   ["中脘","足三里","脾俞"],
-      secondary: ["气海","三阳络"],
-      assist:    ["轻柔留灸，时间适中"],
-      defaultIntensity: "中灸"
+    // 专项匹配函数
+    function matchSpecials(text){
+      const out = [];
+      for (const sp of SPECIAL){
+        if (sp.trigger.test(text)){
+          out.push({ name: sp.name, addPoints: sp.addPoints, note: sp.note });
+        }
+      }
+      return out;
     }
-  };
 
-  // 打分
-  const scores = {};
-  for (const k in patterns) {
-    let s = 0;
-    for (const kw of patterns[k].keys) {
-      if (text.includes(kw.toLowerCase())) s += 1;
-    }
-    // 结构化字段加权
-    if (k === "yangXu" && /冷|畏寒|偏冷/.test(v.limbTemp||"")) s += 1;
-    if (k === "yinXu"  && /口干/.test(v.thirst||"")) s += 1;
-    if (k === "qiZhi"  && /(胸闷|烦闷)/.test(v.feel||"")) s += 1;
-    if (k === "shiRe"  && /(口苦|黄|苔黄)/.test(v.tongue||"")) s += 1;
-    if (k === "piXu"   && /(腹胀|食少|大便稀|腹泻)/.test(v.digestion||"")) s += 1;
-    scores[k] = s;
-  }
+    /* =====================================================
+       [行 560] 组装发送文本（彻底中文化 + 专项说明）
+       ===================================================== */
+    function buildMessage(){
+      const v = {
+        name:   $("#name").value.trim(),
+        chief:  $("#chief").value.trim(),
+        energy: $("#energy").value.trim(),
+        feel:   $("#feel").value,
+        sleep:  $("#sleep").value,
+        stress: $("#stress").value,
+        digestion: $("#digestion").value,
+        limbTemp: $("#limbTemp").value,
+        thirst:  $("#thirst").value,
+        menses:  $("#menses").value,
+        tongue:  $("#tongue").value.trim(),
+        other:   $("#other").value.trim()
+      };
 
-  // 排序得到主证/兼证
-  const arr = Object.entries(scores).sort((a,b)=>b[1]-a[1]);
-  const [top, sec] = [arr[0], arr[1]];
+      const tip = scoreAndSuggest(v);
+      const zhPattern = formatPattern(tip.main, tip.second);
 
-  if (!top || top[1] === 0) {
-    return {
-      main: null, second: null, mixed: false,
-      primary: ["中脘","关元","足三里"],
-      secondary: [],
-      assist: ["基础布阵，30分钟后复查自感再调整"],
-      intensity: "中灸",
-      timePerPointMin: 8,            // 每穴 8 分钟
-      sessionMinutes: 25,           // 单次 25 分钟左右
-      frequency: "每周 2-3 次，10-12 次为一疗程",
-      note: "无明显单一证型，先做基础阵位，再根据反馈微调。"
-    };
-  }
+      // 专项说明拼接
+      let specialTxt = "";
+      if (tip.specials && tip.specials.length){
+        const rows = tip.specials.map(s => `• ${s.name}：加点 ${s.addPoints.join("、")}；要点：${s.note}`);
+        specialTxt = `\n专项叠加：\n${rows.join("\n")}`;
+      }
 
-  const mainCode = top[0];
-  const secondCode = (sec && (top[1]-sec[1] <= 1)) ? sec[0] : null;
-  const main = patterns[mainCode];
-
-  // 强度按精力微调
-  let intensity = main.defaultIntensity;
-  const energy = Number(v.energy || 6);
-  if (energy <= 4 && intensity === "中灸") intensity = "浅灸";
-  if (energy >= 8 && intensity === "浅灸") intensity = "中灸";
-
-  // 强度 → 时长建议
-  const intensityMap = {
-    "浅灸": { timePerPointMin: 6, sessionMinutes: 18 },
-    "中灸": { timePerPointMin: 8, sessionMinutes: 25 },
-    "深灸": { timePerPointMin: 10, sessionMinutes: 30 }
-  };
-  const tCfg = intensityMap[intensity] || { timePerPointMin: 8, sessionMinutes: 25 };
-
-  return {
-    main: mainCode,
-    second: secondCode,
-    mixed: !!secondCode,
-    primary: main.primary,
-    secondary: main.secondary,
-    assist: main.assist,
-    intensity,
-    timePerPointMin: tCfg.timePerPointMin,
-    sessionMinutes: tCfg.sessionMinutes,
-    frequency: "每周 2-3 次，10-12 次为一疗程；症状缓解后转维持 1 次/周",
-    note: secondCode
-      ? `与 ${cnCode(secondCode)} 兼证概率较高，可兼顾其要点。`
-      : `以 ${cnCode(mainCode)} 为主进行灸疗。`
-  };
-}
-
-
-   /* ====== 组装发送文本（全部中文展示） ====== */
-function buildMessage(){
-  const v = {
-    name:   $("#name").value.trim(),
-    chief:  $("#chief").value.trim(),
-    energy: $("#energy").value.trim(),
-    feel:   $("#feel").value,
-    sleep:  $("#sleep").value,
-    stress: $("#stress").value,
-    digestion: $("#digestion").value,
-    limbTemp: $("#limbTemp").value,
-    thirst:  $("#thirst").value,
-    menses:  $("#menses").value,
-    tongue:  $("#tongue").value.trim(),
-    other:   $("#other").value.trim()
-  };
-
-  const tip = suggestPoints(v);
-  const zhPattern = formatPattern(tip.main, tip.second);
-
-  const sys = `【系统建议】
+      const sys = `【系统建议】
 证型：${zhPattern}
 灸法：${tip.intensity}
 基础位：${(tip.primary && tip.primary.length) ? tip.primary.join("、") : "—"}
@@ -357,9 +402,10 @@ function buildMessage(){
 辅助：${(tip.assist && tip.assist.length) ? tip.assist.join("、") : "—"}
 时长：每穴约 ${tip.timePerPointMin} 分钟；单次 ${tip.sessionMinutes} 分钟
 频次：${tip.frequency}
-说明：${tip.note}`;
+气机分层：${tip.qiLayerNote}
+说明：${tip.note}${specialTxt}`;
 
-  return `
+      return `
 客户信息：
 姓名/编号：${v.name || "未填"}
 主诉：${v.chief || "未填"}
@@ -371,9 +417,11 @@ function buildMessage(){
 
 ${sys}
 `.trim();
-}
+    }
 
-    /* ====== 发送与清空 ====== */
+    /* =====================================================
+       [行 630] 发送与清空（WhatsApp 不变）
+       ===================================================== */
     btn.addEventListener("click", () => {
       const msg = buildMessage();
 
@@ -402,5 +450,6 @@ ${sys}
       notice.style.display = "none";
     });
   </script>
+  <!-- ======= 脚本结束 ======= -->
 </body>
 </html>
