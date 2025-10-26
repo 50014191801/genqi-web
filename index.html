@@ -2,9 +2,9 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" const supabaseUrl = 'https://hspnngnztcxrojngrcjx.supabase.co'/>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>GenQi Pro · 艾灸馆智能接诊系统</title>
-  <meta name="description" const supabaseKey = process.env.SUPABASE_KEY" />
+  <meta name="description" content="店长一键录入，自动发送门店后台，店内即时接诊；支持轻症问诊、记录与回访。" />
   <meta name="theme-color" content="#0ea5e9" />
   <style>
     :root{
@@ -62,13 +62,13 @@
     <div class="logo">
       <div class="qi">Qi</div>
       <div>
-        <h1>GenQi Pro · 艾灸馆智能接诊系统</h1>
+        <h1>GenQi Pro · 光疗馆智能接诊系统</h1>
         <div class="subtitle">客户输入症状 → 自动发送门店后台 → 店内即时接诊</div>
       </div>
     </div>
 
     <div class="card">
-      <h3>📝 客户症状录入表</h3>
+      <h3>📝 客户基础情况录入表</h3>
 
       <div class="full">
         <label>客户姓名（或编号）</label>
@@ -154,24 +154,29 @@
       </div>
 
       <div id="success" class="success">
-        ✅ 信息已发送至门店，请稍候老师联系您。
+        ✅ 信息已发送至门店。
       </div>
     </div>
 
     <div class="footer">
-      © 2025 GenQi Pro · 专业艾灸馆接诊系统。所有内容仅供健康调理参考。
+      © 2025 GenQi Pro · 专业光疗馆智能评估系统。所有内容仅供健康调理参考。
     </div>
   </div>
 
   <script>
+    // 未来接 Supabase 时在这里放：URL / ANON KEY / STORE_ID
+    // const SUPABASE_URL = '...';
+    // const SUPABASE_ANON_KEY = '...';
+    // const STORE_ID = '...';
+
     const $ = s => document.querySelector(s);
     const btn = $("#send");
     const resetBtn = $("#reset");
     const notice = $("#success");
 
-    // 你的门店联系方式
-    const storeEmail = "borneonmoxa@gmail.com"; // 
-    const storeWA = "0109732328"; // 
+    // 你的门店联系方式（✅ WhatsApp 必须用国际格式：国家码+去掉前导0）
+    const storeEmail = "borneonmoxa@gmail.com";
+    const storeWA = "60109732328"; // 
 
     function buildMessage(){
       const v = {
@@ -209,10 +214,10 @@
       const mailto = `mailto:${storeEmail}?subject=${subject}&body=${body}`;
       const wa = `https://wa.me/${storeWA}?text=${body}`;
 
-      // 默认打开WhatsApp发送
+      // 默认打开 WhatsApp 发送
       window.open(wa, "_blank");
       notice.style.display = "block";
-      // 也同时预备邮件方案（可作为备份）
+      // 作为备份，再打开邮件
       setTimeout(()=>{ window.open(mailto, "_blank"); }, 1000);
     });
 
