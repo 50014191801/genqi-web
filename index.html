@@ -179,38 +179,106 @@
     const storeWA = "60109732328"; // 
 
     function suggestPoints(v) {
-    const text = `${v.chief} ${v.feel} ${v.digestion} ${v.limbTemp} ${v.thirst} ${v.other}`;
-    if (/冷|怕冷|手脚冷|腹胀|大便稀|困/.test(text)) {
-      return "阳虚体质：关元、命门、足三里、气海";
-    } else if (/口干|失眠|烦躁|舌红|盗汗/.test(text)) {
-      return "阴虚体质：三阴交、太溪、神门、涌泉";
-    } else if (/胸闷|胀|嗳气|气滞/.test(text)) {
-      return "气滞体质：膻中、中脘、太冲、期门";
-    } else if (/舌黄|便秘|痘|湿|痰/.test(text)) {
-      return "湿热体质：阴陵泉、曲池、足三里、丰隆";
-    } else if (/腹泻|食少|疲劳|乏力/.test(text)) {
-      return "脾虚体质：中脘、足三里、气海、脾俞";
-    } else {
-      return "综合调理：中脘、关元、足三里（基础布阵）";
+  // 1) 关键词库（可后期继续扩充）
+  const patterns = {
+    yangXu: {  // 阳虚
+      keys: ["怕冷","手脚冷","畏寒","喜热","四肢乏力","小便清长"],
+      primary: ["关元","命门","气海","足三里"],
+      secondary: ["肾俞","中极"],
+      assist: ["温补艾法：隔姜灸/艾条温和灸"],
+      defaultIntensity: "中灸" // 浅灸/中灸/深灸
+    },
+    yinXu: { // 阴虚
+      keys: ["盗汗","口干","舌红","失眠","心烦","夜汗"],
+      primary: ["三阴交","太溪","神门"],
+      secondary: ["涌泉","照海"],
+      assist: ["间歇灸/减量灸"], 
+      defaultIntensity: "浅灸"
+    },
+    qiZhi: { // 气滞
+      keys: ["胸闷","胀","嗳气","烦闷","情绪抑郁","易怒"],
+      primary: ["膻中","中脘","太冲"],
+      secondary: ["期门","行间"],
+      assist: ["顺气手法配合灸"], 
+      defaultIntensity: "中灸"
+    },
+    shiRe: { // 湿热
+      keys: ["口苦","便秘","小便黄","痤疮","舌苔黄腻","口干"],
+      primary: ["阴陵泉","曲池","足三里","丰隆"],
+      secondary: ["内庭","合谷"],
+      assist: ["清法配合短时频次"], 
+      defaultIntensity: "浅灸"
+    },
+    piXu: { // 脾虚
+      keys: ["食少","腹胀","乏力","面色萎黄","大便稀"],
+      primary: ["中脘","足三里","脾俞"],
+      secondary: ["气海","三阳络"],
+      assist: ["轻柔灸/留灸时间短"], 
+      defaultIntensity: "中灸"
     }
+  };
+
+  // 2) 创建一个干净的文本用于匹配
+  const text = `${v.chief} ${v.feel} ${v.digestion} ${v.limbTemp} ${v.thirst} ${v.tongue} ${v.other} ${v.menses}`.toLowerCase();
+
+  // 3) 逐证型打分（关键词出现次数）
+  const scores = {};
+  for (const key in patterns) {
+    let s = 0;
+    for (const k of patterns[key].keys) {
+      // 简单匹配：如果症状包含该关键词则+1
+      if (text.indexOf(k.toLowerCase()) !== -1) s += 1;
+    }
+    scores[key] = s;
   }
 
-  // ✨ 正确的消息拼装函数（把“客户信息：…”放在这里）
-  function buildMessage() {
-    const v = {
-      name: $("#name").value.trim(),
-      chief: $("#chief").value.trim(),
-      energy: $("#energy").value.trim(),
-      feel: $("#feel").value,
-      sleep: $("#sleep").value,
-      stress: $("#stress").value,
-      digestion: $("#digestion").value,
-      limbTemp: $("#limbTemp").value,
-      thirst: $("#thirst").value,
-      menses: $("#menses").value,
-      tongue: $("#tongue").value.trim(),
-      other: $("#other").value.trim()
+  // 4) 归一化与排序
+  const entries = Object.entries(scores).sort((a,b)=>b[1]-a[1]);
+  const top = entries[0]; // [patternKey, score]
+  const second = entries[1];
+
+  // 5) 构建建议（主证 + 备证）
+  const suggestions = [];
+  if (top[1] === 0) {
+    // 没有明显命中任何单一证型 -> 综合布阵
+    return {
+      pattern: "综合/未定型",
+      score: 0,
+      primary: ["中脘","关元","足三里"],
+      secondary: [],
+      assist: ["以基础布阵为主，短疗程观察；若舌红/口苦考虑偏阴虚/湿热方向"],
+      intensity: "中灸",
+      note: "无明显单一证型，建议先做基础布阵并记录反馈30分钟后调整。"
     };
+  }
+
+  const mainPattern = top[0];
+  const mainInfo = patterns[mainPattern];
+  // 如果第二高与最高接近（比如差 <=1），提示兼证
+  const isMixed = second && (top[1] - second[1] <= 1);
+
+  const out = {
+    pattern: mainPattern + (isMixed ? "（可能夹杂其他证）": ""),
+    score: top[1],
+    primary: mainInfo.primary,
+    secondary: mainInfo.secondary,
+    assist: mainInfo.assist,
+    intensity: mainInfo.defaultIntensity,
+    note: isMixed ? `与${second[0]}并证可能性较高，临床上可酌情同时照顾兼证要点。` : `建议按${mainPattern}为主进行灸疗。`
+  };
+
+  // 6) 基于个别危险信号调整：若出现“胸痛/呼吸困难/高热/晕厥”等应立即提示就医，不建议灸
+  const redFlags = ["胸痛","呼吸困难","高热","晕厥","严重出血"];
+  for (const rf of redFlags) if (text.indexOf(rf) !== -1) {
+    out.note = "出现紧急信号（"+rf+"），请立即就医，避免在门店继续灸治。";
+    out.primary = [];
+    out.secondary = [];
+    out.assist = [];
+    out.intensity = "禁灸";
+    return out;
+  }
+    return out;
+}  
     const tip = suggestPoints(v);
 
     return `
