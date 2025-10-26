@@ -164,10 +164,103 @@
   </div>
 
   <script>
-    // 未来接 Supabase 时在这里放：URL / ANON KEY / STORE_ID
-    // const SUPABASE_URL = '...';
-    // const SUPABASE_ANON_KEY = '...';
-    // const STORE_ID = '...';
+   // 汉化证型名
+function cn(p){ 
+  const map={yangXu:'阳虚', yinXu:'阴虚', qiZhi:'气滞', shiRe:'湿热', piXu:'脾虚', '综合/未定型':'综合/未定型'};
+  return map[p] || p;
+}
+
+// 更专业的证型打分与布火建议
+function suggestPoints(v) {
+  const patterns = {
+    yangXu: {  // 阳虚
+      keys: ["怕冷","手脚冷","畏寒","喜热","四肢乏力","小便清长"],
+      primary: ["关元","命门","气海","足三里"],
+      secondary: ["肾俞","中极"],
+      assist: ["隔姜灸 / 艾条温和灸"],
+      defaultIntensity: "中灸"
+    },
+    yinXu: { // 阴虚
+      keys: ["盗汗","口干","舌红","失眠","心烦","夜汗"],
+      primary: ["三阴交","太溪","神门"],
+      secondary: ["涌泉","照海"],
+      assist: ["减量灸 / 间歇灸"], 
+      defaultIntensity: "浅灸"
+    },
+    qiZhi: { // 气滞
+      keys: ["胸闷","胀","嗳气","烦闷","情绪","易怒"],
+      primary: ["膻中","中脘","太冲"],
+      secondary: ["期门","行间"],
+      assist: ["顺气手法配合灸"], 
+      defaultIntensity: "中灸"
+    },
+    shiRe: { // 湿热
+      keys: ["口苦","便秘","小便黄","痤疮","苔黄腻","口干"],
+      primary: ["阴陵泉","曲池","足三里","丰隆"],
+      secondary: ["内庭","合谷"],
+      assist: ["清法为主，短时多次"], 
+      defaultIntensity: "浅灸"
+    },
+    piXu: { // 脾虚
+      keys: ["食少","腹胀","乏力","面色萎黄","大便稀"],
+      primary: ["中脘","足三里","脾俞"],
+      secondary: ["气海","三阳络"],
+      assist: ["轻柔留灸，时间适中"], 
+      defaultIntensity: "中灸"
+    }
+  };
+
+  const text = `${v.chief} ${v.feel} ${v.digestion} ${v.limbTemp} ${v.thirst} ${v.tongue} ${v.other} ${v.menses}`.toLowerCase();
+
+  // 打分
+  const scores = {};
+  for (const k in patterns) {
+    let s = 0;
+    for (const kw of patterns[k].keys) {
+      if (text.indexOf(kw.toLowerCase()) !== -1) s += 1;
+    }
+    scores[k] = s;
+  }
+
+  // 排序
+  const arr = Object.entries(scores).sort((a,b)=>b[1]-a[1]);
+  const top = arr[0]; 
+  const sec = arr[1];
+
+  // 紧急禁灸信号
+  const redFlags = ["胸痛","呼吸困难","高热","晕厥","严重出血"];
+  for (const rf of redFlags) if (text.indexOf(rf) !== -1) {
+    return {
+      pattern:"综合/未定型",
+      primary:[], secondary:[], assist:[],
+      intensity:"禁灸",
+      note:`出现紧急信号（${rf}），请立即就医，暂停灸疗。`
+    };
+  }
+
+  if (!top || top[1] === 0) {
+    return {
+      pattern:"综合/未定型",
+      primary:["中脘","关元","足三里"],
+      secondary:[],
+      assist:["基础布阵，30分钟后复查自感再调整"],
+      intensity:"中灸",
+      note:"无明显单一证型，先做基础阵位。"
+    };
+  }
+
+  const main = patterns[top[0]];
+  const mixed = sec && (top[1]-sec[1] <= 1);
+  return {
+    pattern: mixed ? `${top[0]}（兼证可能）` : top[0],
+    primary: main.primary,
+    secondary: main.secondary,
+    assist: main.assist,
+    intensity: main.defaultIntensity,
+    note: mixed ? `与 ${sec[0]} 兼证概率较高，可兼顾其要点。` : `以 ${top[0]} 为主进行灸疗。`
+  };
+}
+
 
     const $ = s => document.querySelector(s);
     const btn = $("#send");
@@ -281,7 +374,35 @@
 }  
     const tip = suggestPoints(v);
 
-    return `
+ function buildMessage(){
+  const v = {
+    name: $("#name").value.trim(),
+    chief: $("#chief").value.trim(),
+    energy: $("#energy").value.trim(),
+    feel: $("#feel").value,
+    sleep: $("#sleep").value,
+    stress: $("#stress").value,
+    digestion: $("#digestion").value,
+    limbTemp: $("#limbTemp").value,
+    thirst: $("#thirst").value,
+    menses: $("#menses").value,
+    tongue: $("#tongue").value.trim(),
+    other: $("#other").value.trim()
+  };
+
+  // 这里调用专业辩证
+  const tipObj = suggestPoints(v);
+
+  const sys =
+`【系统建议】
+证型：${cn(tipObj.pattern)}
+灸法：${tipObj.intensity}
+基础位：${(tipObj.primary && tipObj.primary.length)? tipObj.primary.join("、") : "—"}
+强化位：${(tipObj.secondary && tipObj.secondary.length)? tipObj.secondary.join("、") : "—"}
+辅助：${(tipObj.assist && tipObj.assist.length)? tipObj.assist.join("、") : "—"}
+说明：${tipObj.note}`;
+
+  return `
 客户信息：
 姓名/编号：${v.name || "未填"}
 主诉：${v.chief || "未填"}
@@ -291,9 +412,9 @@
 舌/皮肤等：${v.tongue || "—"}
 补充：${v.other || "—"}
 
-系统提示：${tip}
-    `.trim();
-  }
+${sys}
+`.trim();
+}
 
     btn.addEventListener("click", ()=>{
       const msg = buildMessage();
