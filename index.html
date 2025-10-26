@@ -179,34 +179,53 @@
     const storeWA = "60109732328"; // 
 
     function suggestPoints(v) {
-  const text = `${v.chief} ${v.feel} ${v.digestion} ${v.limbTemp} ${v.thirst} ${v.other}`;
-  if(/冷|怕冷|手脚冷|腹胀|大便稀|困/.test(text)) {
-    return "阳虚体质：关元、命门、足三里、气海";
-  } else if(/口干|失眠|烦躁|舌红|盗汗/.test(text)) {
-    return "阴虚体质：三阴交、太溪、神门、涌泉";
-  } else if(/胸闷|胀|嗳气|气/.test(text)) {
-    return "气滞体质：膻中、中脘、太冲、期门";
-  } else if(/舌黄|便秘|痘|湿|痰/.test(text)) {
-    return "湿热体质：阴陵泉、曲池、足三里、丰隆";
-  } else if(/腹泻|食少|疲劳|乏力/.test(text)) {
-    return "脾虚体质：中脘、足三里、气海、脾俞";
-  } else {
-    return "综合调理：中脘、关元、足三里（基础布阵）";
+    const text = `${v.chief} ${v.feel} ${v.digestion} ${v.limbTemp} ${v.thirst} ${v.other}`;
+    if (/冷|怕冷|手脚冷|腹胀|大便稀|困/.test(text)) {
+      return "阳虚体质：关元、命门、足三里、气海";
+    } else if (/口干|失眠|烦躁|舌红|盗汗/.test(text)) {
+      return "阴虚体质：三阴交、太溪、神门、涌泉";
+    } else if (/胸闷|胀|嗳气|气滞/.test(text)) {
+      return "气滞体质：膻中、中脘、太冲、期门";
+    } else if (/舌黄|便秘|痘|湿|痰/.test(text)) {
+      return "湿热体质：阴陵泉、曲池、足三里、丰隆";
+    } else if (/腹泻|食少|疲劳|乏力/.test(text)) {
+      return "脾虚体质：中脘、足三里、气海、脾俞";
+    } else {
+      return "综合调理：中脘、关元、足三里（基础布阵）";
+    }
   }
-}
 
+  // ✨ 正确的消息拼装函数（把“客户信息：…”放在这里）
+  function buildMessage() {
+    const v = {
+      name: $("#name").value.trim(),
+      chief: $("#chief").value.trim(),
+      energy: $("#energy").value.trim(),
+      feel: $("#feel").value,
+      sleep: $("#sleep").value,
+      stress: $("#stress").value,
+      digestion: $("#digestion").value,
+      limbTemp: $("#limbTemp").value,
+      thirst: $("#thirst").value,
+      menses: $("#menses").value,
+      tongue: $("#tongue").value.trim(),
+      other: $("#other").value.trim()
+    };
+    const tip = suggestPoints(v);
+
+    return `
 客户信息：
 姓名/编号：${v.name || "未填"}
 主诉：${v.chief || "未填"}
-精力：${v.energy}/10；睡眠：${v.sleep}h；压力：${v.stress}
+精力：${v.energy || "—"}/10；睡眠：${v.sleep || "—"}h；压力：${v.stress || "—"}
 体感：${v.feel || "—"}；消化：${v.digestion || "—"}
-手脚温：${v.limbTemp}；饮水：${v.thirst}；经期：${v.menses}
+手脚温：${v.limbTemp || "—"}；饮水：${v.thirst || "—"}；经期：${v.menses || "—"}
 舌/皮肤等：${v.tongue || "—"}
 补充：${v.other || "—"}
 
-系统提示：请根据客户体质安排艾灸位（中脘、关元、足三里为基础）。
-`.trim();
-    }
+系统提示：${tip}
+    `.trim();
+  }
 
     btn.addEventListener("click", ()=>{
       const msg = buildMessage();
