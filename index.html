@@ -418,28 +418,66 @@
 ${sys}
 `.trim();
     }
-
-    /* =====================================================
-       [行 630] 发送与清空（WhatsApp 不变）
+/* =====================================================
+       [行 410] 起火-布火-收火 流程模板（随焦域与强度微调）
        ===================================================== */
-    btn.addEventListener("click", () => {
-      const msg = buildMessage();
+    const FIRE_FLOW = {
+      "上焦":  { start:["百会","膻中"],        main:["中脘","太冲"],            close:["太溪","涌泉"] },
+      "中焦":  { start:["中脘","天枢"],        main:["关元","足三里","脾俞"],    close:["涌泉","太溪"] },
+      "下焦":  { start:["关元","气海"],        main:["命门","肾俞","中极"],      close:["太溪","涌泉"] },
+      "中上焦":{ start:["膻中"],              main:["丰隆","阴陵泉","中脘"],    close:["内关","太溪"] },
+      "上中焦":{ start:["膻中","太冲"],        main:["血海","膈俞"],            close:["内关","涌泉"] },
+      "中下焦":{ start:["中脘","关元"],        main:["气海","足三里","脾俞"],    close:["太溪","关元"] }
+    };
 
-      // WhatsApp —— 中文必须编码
-      const wa = `https://wa.me/${storeWA}?text=${encodeURIComponent(msg)}`;
-      window.open(wa, "_blank");
+    function fireFlowBy(tip){
+      // 选择焦域模板
+      const layerKey = tip?.qiLayerNote?.includes("上") && !tip?.qiLayerNote?.includes("下") ? "上焦"
+                    : tip?.qiLayerNote?.includes("下") && !tip?.qiLayerNote?.includes("上") ? "下焦"
+                    : tip?.qiLayerNote?.includes("上中") ? "上中焦"
+                    : tip?.qiLayerNote?.includes("中上") ? "中上焦"
+                    : tip?.qiLayerNote?.includes("中下") ? "中下焦"
+                    : "中焦";
+      const tpl = FIRE_FLOW[layerKey] || FIRE_FLOW["中焦"];
 
-      // 邮件备份（可选，不影响WhatsApp）
-      if (storeEmail) {
-        const subject = encodeURIComponent("新客户预约 - GenQi Pro");
-        const body    = encodeURIComponent(msg);
-        const mailto  = `mailto:${storeEmail}?subject=${subject}&body=${body}`;
-        setTimeout(() => window.open(mailto, "_blank"), 800);
-      }
+      // 强度→分段时长微调
+      const I = tip.intensity || "中灸";
+      const per = (I==="浅灸") ? {start:5, main:6, close:4}
+               : (I==="深灸") ? {start:6, main:10, close:5}
+               :                 {start:5, main:8,  close:4};
 
-      notice.style.display = "block";
-    });
+      return {
+        start: tpl.start, startMin: per.start,
+        main:  tpl.main.length ? tpl.main : (tip.primary || []), mainMin: per.main,
+        close: tpl.close, closeMin: per.close
+      };
+    }
+  // =====================================================
+// 发送与清空（WhatsApp 发送）
+// =====================================================
+btn.addEventListener("click", () => {
+  const msg = buildMessage(); // 在 buildMessage 里完成辩证 + 拼装
+   const tip  = scoreAndSuggest(v);    // 专业辩证
+  const zhPattern = cn(tip.pattern);  // 英文枚举转中文
+  const flow = fireFlowBy(tip);       // 起火/布火/收火
 
+  const sys = `【系统建议】
+证型：${zhPattern}
+灸法：${tip.intensity}
+基础位：${(tip.primary && tip.primary.length) ? tip.primary.join("、") : "—"}
+强化位：${(tip.secondary && tip.secondary.length) ? tip.secondary.join("、") : "—"}
+辅助：${(tip.assist && tip.assist.length) ? tip.assist.join("、") : "—"}
+时长：每穴约 ${tip.timePerPointMin} 分钟；单次 ${tip.sessionMinutes} 分钟
+频次：${tip.frequency}
+气机分层：${tip.qiLayerNote}
+—— 起火 · 布火 · 收火 ——
+起火（开门引阳）：${flow.start.join("、")}（每穴约 ${flow.startMin} 分）
+布火（主战位）：${flow.main.join("、")}（每穴约 ${flow.mainMin} 分）
+收火（归根固摄）：${flow.close.join("、")}（每穴约 ${flow.closeMin} 分）
+说明：${tip.note}` +
+  ((tip.specials && tip.specials.length)
+    ? `\n专项叠加：\n${tip.specials.map(s => `• ${s.name}：加点 ${s.addPoints.join("、")}；要点：${s.note}`).join("\n")}`
+    : "");
     resetBtn.addEventListener("click", () => {
       document.querySelectorAll("input,select,textarea").forEach(el => {
         if (el.id === "energy") el.value = 6;
