@@ -1,6 +1,33 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
+  /* === GenQi：封面 & 卡片 & 表单网格（不影响你原样式，全部以 gq- 前缀） === */
+.gq-wrap{max-width:1000px;margin:0 auto;padding:28px}
+.gq-hero{
+  background:linear-gradient(135deg,#eef7ff,#fff7fb);
+  border:1px solid #e5e7eb;border-radius:18px;padding:28px 24px;margin:16px 0 22px;
+  display:flex;align-items:center;gap:16px;box-shadow:0 10px 30px rgba(2,132,199,.10)
+}
+.gq-logo{width:56px;height:56px;border-radius:14px;background:#111;color:#fff;
+  display:grid;place-items:center;font-weight:800;font-size:20px}
+.gq-hero h1{margin:0;font-size:24px}
+.gq-hero .sub{margin-top:6px;color:#64748b}
+.gq-cta{margin-top:8px}
+.gq-btn{padding:10px 14px;border-radius:12px;border:1px solid #e5e7eb;background:#0ea5e9;color:#fff;font-weight:600;cursor:pointer}
+.gq-btn.ghost{background:#fff;color:#0f172a}
+.gq-card{
+  background:#fff;border:1px solid #e5e7eb;border-radius:18px;padding:20px;box-shadow:0 10px 30px rgba(2,132,199,.08)
+}
+.gq-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.gq-full{grid-column:1/-1}
+.gq-field label{font-size:13px;color:#475569;display:block;margin:0 0 6px}
+.gq-field input,.gq-field select,.gq-field textarea{
+  width:100%;padding:10px 12px;border:1px solid #e5e7eb;border-radius:12px;outline:none
+}
+.gq-field input:focus,.gq-field select:focus,.gq-field textarea:focus{
+  border-color:#0ea5e9;box-shadow:0 0 0 3px rgba(14,165,233,.15)
+}
+.gq-actions{display:flex;gap:10px;margin-top:14px}
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>GenQi Pro · 艾灸馆智能接诊系统</title>
@@ -59,6 +86,31 @@
   </style>
 </head>
 <body>
+  <div class="gq-wrap">
+  <!-- 封面（Hero） -->
+  <section class="gq-hero" id="gq-hero">
+    <div class="gq-logo">Qi</div>
+    <div>
+      <h1>GenQi Pro · 艾灸馆智能接诊系统</h1>
+      <div class="sub">门店私域接诊 · 表单数据直达店长/店员 · 支持后续辩证与起火/布火/收火</div>
+      <div class="gq-cta">
+        <button class="gq-btn" onclick="document.getElementById('gq-form').scrollIntoView({behavior:'smooth'})">开始录入</button>
+        <button class="gq-btn ghost" onclick="location.href='#gq-form'">直接定位表单</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 接诊表单卡片（挂载点 renderForm 会渲染字段） -->
+  <section class="gq-card" id="gq-form">
+    <h3 style="margin-top:0">📝 客户症状录入表</h3>
+    <div id="gq-form-mount" class="gq-grid"></div>
+    <div class="gq-actions">
+      <!-- 注意：保持 send/reset 这两个 ID，不影响你现有的 WhatsApp 发送逻辑 -->
+      <button id="send" class="gq-btn">提交至门店</button>
+      <button id="reset" class="gq-btn ghost" type="button">清空</button>
+    </div>
+  </section>
+</div>
   <div class="wrap">
     <div class="logo">
       <div class="qi">Qi</div>
@@ -488,6 +540,30 @@ btn.addEventListener("click", () => {
       notice.style.display = "none";
     });
   </script>
-  <!-- ======= 脚本结束 ======= -->
+  <div class="gq-wrap">
+  <!-- 封面（Hero） -->
+  <section class="gq-hero" id="gq-hero">
+    <div class="gq-logo">Qi</div>
+    <div>
+      <h1>GenQi Pro · 艾灸馆智能接诊系统</h1>
+      <div class="sub">门店私域接诊 · 表单数据直达店长/店员 · 支持后续辩证与起火/布火/收火</div>
+      <div class="gq-cta">
+        <button class="gq-btn" onclick="document.getElementById('gq-form').scrollIntoView({behavior:'smooth'})">开始录入</button>
+        <button class="gq-btn ghost" onclick="location.href='#gq-form'">直接定位表单</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 接诊表单卡片（挂载点 renderForm 会渲染字段） -->
+  <section class="gq-card" id="gq-form">
+    <h3 style="margin-top:0">📝 客户症状录入表</h3>
+    <div id="gq-form-mount" class="gq-grid"></div>
+    <div class="gq-actions">
+      <!-- 注意：保持 send/reset 这两个 ID，不影响你现有的 WhatsApp 发送逻辑 -->
+      <button id="send" class="gq-btn">提交至门店</button>
+      <button id="reset" class="gq-btn ghost" type="button">清空</button>
+    </div>
+  </section>
+</div> 
 </body>
 </html>
