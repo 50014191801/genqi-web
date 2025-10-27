@@ -1,569 +1,392 @@
-<!doctype html>
-<html lang="zh-CN">
-<head>
-  /* === GenQi：封面 & 卡片 & 表单网格（不影响你原样式，全部以 gq- 前缀） === */
-.gq-wrap{max-width:1000px;margin:0 auto;padding:28px}
-.gq-hero{
-  background:linear-gradient(135deg,#eef7ff,#fff7fb);
-  border:1px solid #e5e7eb;border-radius:18px;padding:28px 24px;margin:16px 0 22px;
-  display:flex;align-items:center;gap:16px;box-shadow:0 10px 30px rgba(2,132,199,.10)
+// GenQi Sabah Intake App - Single-file MVP
+// 技术：React + Tailwind + supabase-js（浏览器端使用 anon key）
+// 用途：
+// 1) 公网顾客自助填写问诊表（/intake）
+// 2) 店内员工使用 Admin 区域（登录后）可搜索/查看/追踪顾客档案
+// 3) 可新增回访记录（Visits）与上传舌象/脉象图片（Supabase Storage）
+//
+// ⚙️ 上线前配置（必读）：
+// - 新建 Supabase Project，拷贝 Project URL 与 anon 公钥到 .env（或临时粘贴至下方 env 占位）
+// - SQL 建表与 RLS（复制到 Supabase SQL Editor 运行）：
+// -------------------------------------------------------------
+// -- schema: public
+// create table if not exists customers (
+//   id uuid primary key default gen_random_uuid(),
+//   full_name text not null,
+//   phone text,
+//   gender text,
+//   age int,
+//   created_at timestamp with time zone default now(),
+//   updated_at timestamp with time zone default now()
+// );
+// create table if not exists visits (
+//   id uuid primary key default gen_random_uuid(),
+//   customer_id uuid references customers(id) on delete cascade,
+//   visit_date date default current_date,
+//   symptoms text,
+//   bowel text,
+//   urine text,
+//   sleep text,
+//   thirst text,
+//   tongue text,
+//   pulse text,
+//   body_feel text,
+//   menstrual text,
+//   notes text,
+//   created_at timestamp with time zone default now()
+// );
+// -- 开启 RLS
+// alter table customers enable row level security;
+// alter table visits enable row level security;
+// -- 匿名可插入数据（顾客自助提交）
+// create policy "anon_insert_customers" on customers
+//   for insert to anon with check (true);
+// create policy "anon_insert_visits" on visits
+//   for insert to anon with check (true);
+// -- 登录用户可读写全部（店内员工账号）
+// create policy "auth_full_access_customers" on customers
+//   for all to authenticated using (true) with check (true);
+// create policy "auth_full_access_visits" on visits
+//   for all to authenticated using (true) with check (true);
+// -------------------------------------------------------------
+// - Storage: 建 bucket name = "uploads"，Public
+// - Auth: 启用 Email/Password，创建店员账户（如 admin@sabah.genqi.vip ）
+// - 部署：推荐 Vercel，绑定自定义域 sabah.genqi.vip（DNS CNAME 到 Vercel）
+// ----------------------------------------------
+
+import React, { useEffect, useMemo, useState } from "react";
+import { createClient } from "@supabase/supabase-js";
+
+// ====== 1) 环境变量占位（部署到 Vercel 时使用环境变量，不要写死） ======
+const SUPABASE_URL = (globalThis as any).env?.SUPABASE_URL || "https://YOUR-PROJECT.supabase.co";
+const SUPABASE_ANON_KEY = (globalThis as any).env?.SUPABASE_ANON_KEY || "YOUR-ANON-KEY";
+
+// ====== 2) 初始化 Supabase 客户端 ======
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ====== 3) UI 小组件 ======
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="bg-white/80 backdrop-blur border rounded-2xl shadow p-6 mb-6">
+      <h2 className="text-xl font-semibold mb-4">{title}</h2>
+      {children}
+    </div>
+  );
 }
-.gq-logo{width:56px;height:56px;border-radius:14px;background:#111;color:#fff;
-  display:grid;place-items:center;font-weight:800;font-size:20px}
-.gq-hero h1{margin:0;font-size:24px}
-.gq-hero .sub{margin-top:6px;color:#64748b}
-.gq-cta{margin-top:8px}
-.gq-btn{padding:10px 14px;border-radius:12px;border:1px solid #e5e7eb;background:#0ea5e9;color:#fff;font-weight:600;cursor:pointer}
-.gq-btn.ghost{background:#fff;color:#0f172a}
-.gq-card{
-  background:#fff;border:1px solid #e5e7eb;border-radius:18px;padding:20px;box-shadow:0 10px 30px rgba(2,132,199,.08)
+
+function Input({ label, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { label?: string }) {
+  return (
+    <label className="block mb-3">
+      {label && <span className="block text-sm text-gray-600 mb-1">{label}</span>}
+      <input
+        className="w-full rounded-xl border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-900/20"
+        {...props}
+      />
+    </label>
+  );
 }
-.gq-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.gq-full{grid-column:1/-1}
-.gq-field label{font-size:13px;color:#475569;display:block;margin:0 0 6px}
-.gq-field input,.gq-field select,.gq-field textarea{
-  width:100%;padding:10px 12px;border:1px solid #e5e7eb;border-radius:12px;outline:none
+
+function Textarea({ label, ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { label?: string }) {
+  return (
+    <label className="block mb-3">
+      {label && <span className="block text-sm text-gray-600 mb-1">{label}</span>}
+      <textarea
+        className="w-full rounded-xl border px-3 py-2 h-24 focus:outline-none focus:ring-2 focus:ring-gray-900/20"
+        {...props}
+      />
+    </label>
+  );
 }
-.gq-field input:focus,.gq-field select:focus,.gq-field textarea:focus{
-  border-color:#0ea5e9;box-shadow:0 0 0 3px rgba(14,165,233,.15)
-}
-.gq-actions{display:flex;gap:10px;margin-top:14px}
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>GenQi Pro · 艾灸馆智能接诊系统</title>
-  <meta name="description" content="客户症状录入 → 自动生成辩证与气机分层布火建议（含妇科/男性科/老年病科专项） → 一键发送门店 WhatsApp 接诊。" />
-  <meta name="theme-color" content="#0ea5e9" />
-  <style>
-    :root{
-      --bg1:#eef7ff;--bg2:#fff7fb;
-      --fg:#0f172a;--muted:#64748b;--line:#e5e7eb;
-      --brand:#0ea5e9;--brand-600:#0284c7;
-      --card:#ffffff;--shadow:0 10px 30px rgba(2,132,199,.12);
-      --radius:16px;
-    }
-    *{box-sizing:border-box}
-    html,body{height:100%}
-    body{
-      margin:0;color:var(--fg);
-      font:16px/1.6 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto;
-      background:linear-gradient(135deg,var(--bg1),var(--bg2));
-    }
-    a{color:var(--brand);text-decoration:none}
-    .wrap{max-width:980px;margin:0 auto;padding:28px}
-    .logo{display:flex;align-items:center;gap:14px;margin-bottom:16px}
-    .qi{
-      width:56px;height:56px;border-radius:14px;background:#111;color:#fff;display:grid;place-items:center;
-      font-weight:700;box-shadow:var(--shadow);
-    }
-    h1{margin:0;font-size:26px}
-    .subtitle{color:var(--muted);margin-top:4px}
-    .card{
-      background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
-      padding:20px;box-shadow:var(--shadow);
-    }
-    label{font-size:13px;color:#475569}
-    input,select,textarea{
-      width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:12px;
-      outline:none;background:#fff;color:#fg;
-    }
-    textarea{min-height:88px;resize:vertical}
-    input:focus,select:focus,textarea:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(14,165,233,.15)}
-    .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-    .full{grid-column:1/-1}
-    .btns{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
-    .btn{
-      padding:10px 14px;border-radius:12px;border:1px solid transparent;cursor:pointer;font-weight:600;
-      background:var(--brand);color:#fff;
-    }
-    .btn:hover{background:var(--brand-600)}
-    .btn.ghost{background:#fff;color:#111;border-color:var(--line)}
-    .success{
-      background:#e6f8ee;color:#047857;border:1px solid #a7f3d0;
-      padding:14px;border-radius:var(--radius);margin-top:18px;display:none;
-    }
-    .footer{text-align:center;color:#64748b;font-size:12px;margin-top:24px}
-    @media (max-width:760px){ .row{grid-template-columns:1fr} }
-  </style>
-</head>
-<body>
-  <div class="gq-wrap">
-  <!-- 封面（Hero） -->
-  <section class="gq-hero" id="gq-hero">
-    <div class="gq-logo">Qi</div>
-    <div>
-      <h1>GenQi Pro · 艾灸馆智能接诊系统</h1>
-      <div class="sub">门店私域接诊 · 表单数据直达店长/店员 · 支持后续辩证与起火/布火/收火</div>
-      <div class="gq-cta">
-        <button class="gq-btn" onclick="document.getElementById('gq-form').scrollIntoView({behavior:'smooth'})">开始录入</button>
-        <button class="gq-btn ghost" onclick="location.href='#gq-form'">直接定位表单</button>
-      </div>
-    </div>
-  </section>
 
-  <!-- 接诊表单卡片（挂载点 renderForm 会渲染字段） -->
-  <section class="gq-card" id="gq-form">
-    <h3 style="margin-top:0">📝 客户症状录入表</h3>
-    <div id="gq-form-mount" class="gq-grid"></div>
-    <div class="gq-actions">
-      <!-- 注意：保持 send/reset 这两个 ID，不影响你现有的 WhatsApp 发送逻辑 -->
-      <button id="send" class="gq-btn">提交至门店</button>
-      <button id="reset" class="gq-btn ghost" type="button">清空</button>
-    </div>
-  </section>
-</div>
-  <div class="wrap">
-    <div class="logo">
-      <div class="qi">Qi</div>
-      <div>
-        <h1>GenQi Pro · 艾灸馆智能接诊系统</h1>
-        <div class="subtitle">客户输入症状 → 自动生成辩证与气机分层布火建议（含妇科/男性科/老年病科专项） → 一键发送门店接诊</div>
-      </div>
-    </div>
+// ====== 4) Intake 表单（公网） ======
+function IntakeForm({ onSaved }: { onSaved?: (payload: { customerId: string; visitId: string }) => void }) {
+  const [form, setForm] = useState({
+    full_name: "",
+    phone: "",
+    gender: "",
+    age: "",
+    symptoms: "",
+    bowel: "",
+    urine: "",
+    sleep: "",
+    thirst: "",
+    tongue: "",
+    pulse: "",
+    body_feel: "",
+    menstrual: "",
+    notes: "",
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [ok, setOk] = useState<null | string>(null);
+  const [err, setErr] = useState<null | string>(null);
 
-    <div class="card">
-      <h3>📝 客户症状录入表</h3>
+  const update = (k: string, v: string) => setForm((s) => ({ ...s, [k]: v }));
 
-      <div class="full">
-        <label>客户姓名（或编号）</label>
-        <input id="name" placeholder="例：张女士 / Z-2025-001" />
-      </div>
-
-      <div class="full">
-        <label>主诉（最困扰的问题）</label>
-        <input id="chief" placeholder="例：睡不着、胃胀、月经不调、夜尿频、膝痛…" />
-      </div>
-
-      <div class="row">
-        <div>
-          <label>精力（1-10）</label>
-          <input id="energy" type="number" min="1" max="10" value="6" />
-        </div>
-        <div>
-          <label>最近3天体感</label>
-          <select id="feel">
-            <option value="">请选择</option>
-            <option>身轻松</option><option>易疲劳</option><option>头重</option>
-            <option>胸闷/背紧</option><option>心悸</option><option>腰酸</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="row">
-        <div>
-          <label>夜间睡眠（小时）</label>
-          <input id="sleep" type="number" min="3" max="12" value="7" />
-        </div>
-        <div>
-          <label>情绪压力</label>
-          <select id="stress"><option>低</option><option selected>中</option><option>高</option></select>
-        </div>
-      </div>
-
-      <div class="row">
-        <div>
-          <label>消化情况</label>
-          <select id="digestion">
-            <option value="">请选择</option><option>正常</option><option>腹胀</option>
-            <option>便秘</option><option>腹泻</option><option>反酸/烧心</option>
-          </select>
-        </div>
-        <div>
-          <label>手脚温度</label>
-          <select id="limbTemp">
-            <option>正常</option><option>偏冷</option><option>冷</option><option>偏热</option><option>热</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="row">
-        <div>
-          <label>口渴/饮水</label>
-          <select id="thirst">
-            <option>正常</option><option>口干喜冷饮</option><option>不渴少饮</option>
-          </select>
-        </div>
-        <div>
-          <label>女性经期（如适用）</label>
-          <select id="menses">
-            <option selected>不适用/正常</option><option>疼痛</option><option>提前</option>
-            <option>延后</option><option>量多</option><option>量少</option><option>闭经</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="full">
-        <label>舌象/咽喉/皮肤等（可选）</label>
-        <input id="tongue" placeholder="例：舌淡、苔白厚；舌红苔黄；瘀点；厚腻…" />
-      </div>
-
-      <div class="full">
-        <label>其他补充（可选）</label>
-        <textarea id="other" placeholder="例：更年期潮热盗汗；痛经；带下异常；夜尿频；阳痿早泄；膝痛；眩晕耳鸣等…"></textarea>
-      </div>
-
-      <div class="btns">
-        <button class="btn" id="send">提交至门店</button>
-        <button class="btn ghost" id="reset">清空</button>
-      </div>
-
-      <div id="success" class="success">
-        ✅ 信息已发送至门店，请稍候老师联系您。
-      </div>
-    </div>
-
-    <div class="footer">
-      © 2025 GenQi Pro · 专业艾灸馆接诊系统。所有内容仅供健康调理参考；出现紧急症状请立即就医。
-    </div>
-  </div>
-
-  <!-- ======= 脚本开始 ======= -->
-  <script>
-    /* =====================================================
-       [行 300] 基础常量与按钮
-       ===================================================== */
-    const $ = s => document.querySelector(s);
-    const btn = $("#send");
-    const resetBtn = $("#reset");
-    const notice = $("#success");
-
-    // ⚠️ 保持与你现在一致：WhatsApp & 邮件配置不改
-    const storeEmail = "borneonmoxa@gmail.com"; // 可留空
-    const storeWA    = "60109732328";           // 国际格式，无 + / 0 / 空格 / -
-
-    /* =====================================================
-       [行 320] 证型中文映射 & 展示格式化
-       ===================================================== */
-    const PATTERN_CN = {
-      yangXu: "阳虚", yinXu: "阴虚", qiZhi: "气滞", shiRe: "湿热", piXu: "脾虚",
-      tanShi: "痰湿", xueYu: "血瘀", qiXueLiangXu: "气血两虚", ganShenLiangXu: "肝肾两虚",
-      weiReShiJi: "胃热食积", "综合/未定型": "综合/未定型"
-    };
-    function cnCode(code){ return PATTERN_CN[code] || code; }
-    function formatPattern(mainCode, secondCode){
-      if(!mainCode) return PATTERN_CN["综合/未定型"];
-      if(secondCode) return `${cnCode(mainCode)}（兼${cnCode(secondCode)}）`;
-      return cnCode(mainCode);
-    }
-
-    /* =====================================================
-       [行 350] 证型规则库（10 类）+ 气机分层模板
-       ===================================================== */
-    const RULES = {
-      yangXu: { keys:["怕冷","畏寒","手脚冷","喜热","乏力","尿清长","四肢发凉","畏风"],
-        base:["关元","命门","气海","足三里"], plus:["肾俞","中极"], assist:["隔姜灸 / 温和艾条"], intensity:"中灸", focus:"下焦" },
-      yinXu: { keys:["盗汗","口干","舌红","心烦","失眠","夜汗","五心烦热","潮热"],
-        base:["三阴交","太溪","神门"], plus:["涌泉","照海"], assist:["减量灸 / 间歇灸"], intensity:"浅灸", focus:"上焦" },
-      qiZhi: { keys:["胸闷","胀","嗳气","烦闷","情绪","易怒","咽喉异物感","两胁胀痛"],
-        base:["膻中","中脘","太冲"], plus:["期门","行间"], assist:["顺气手法配合灸"], intensity:"中灸", focus:"上焦" },
-      shiRe: { keys:["口苦","便秘","小便黄","痤疮","苔黄腻","口干","腹胀粘滞","大便干结","体臭重"],
-        base:["阴陵泉","曲池","足三里","丰隆"], plus:["内庭","合谷"], assist:["以清为主，短时多次"], intensity:"浅灸", focus:"中焦" },
-      piXu: { keys:["食少","腹胀","乏力","面色萎黄","大便稀","腹泻","纳差","嗜睡","易疲劳"],
-        base:["中脘","足三里","脾俞"], plus:["气海","三阴交"], assist:["轻柔留灸，时间适中"], intensity:"中灸", focus:"中焦" },
-      tanShi: { keys:["痰多","咳痰","胸闷痰鸣","苔厚腻","体形肥胖","困重","眩晕痰上扰"],
-        base:["丰隆","中脘","阴陵泉"], plus:["肺俞","列缺"], assist:["化痰为主，可配合走罐"], intensity:"中灸", focus:"中上焦" },
-      xueYu: { keys:["刺痛","固定痛","痛经瘀块","身上瘀斑","面暗沉","舌有瘀点","胸痹"],
-        base:["血海","膈俞","三阴交"], plus:["太冲","内关"], assist:["活血化瘀，手法配合"], intensity:"中灸", focus:"上中焦" },
-      qiXueLiangXu: { keys:["面色萎黄","心悸气短","头晕","乏力","爪甲淡白","月经量少"],
-        base:["气海","关元","足三里","脾俞"], plus:["膻中","百会"], assist:["温补为主，可配合艾饼"], intensity:"中灸", focus:"中下焦" },
-      ganShenLiangXu: { keys:["腰膝酸软","头晕耳鸣","失眠多梦","目干涩","阳痿","脱发"],
-        base:["肝俞","肾俞","太溪","三阴交"], plus:["关元","太冲"], assist:["滋补肝肾，量宜渐进"], intensity:"浅-中灸", focus:"下焦" },
-      weiReShiJi: { keys:["口渴喜冷","口臭","胃脘灼热","多食易饥","大便干","舌红苔黄","嗳腐吞酸"],
-        base:["内庭","梁丘","中脘","天枢"], plus:["合谷","曲池"], assist:["清胃泄热，慎温"], intensity:"浅灸", focus:"中焦" }
-    };
-
-    // 气机分层模板（焦域 → 补充原则）
-    const QI_LAYERS = {
-      "上焦": { open:["膻中","天突"], descend:["天突","内关"], note:"宣发肃降，情志调畅" },
-      "中焦": { harmonize:["中脘","天枢","脾俞"], move:["太冲","合谷"], note:"健运脾胃，升清降浊" },
-      "下焦": { warm:["关元","中极"], root:["命门","肾俞"], note:"温养冲任，培补下元" },
-      "中上焦": { open:["膻中"], transform:["丰隆","阴陵泉"], note:"化痰宽中，开阖调机" },
-      "上中焦": { move:["膻中","太冲"], blood:["血海","膈俞"], note:"行气活血，通滞止痛" },
-      "中下焦": { tonify:["气海","关元"], harmonize:["中脘","脾俞"], note:"补益气血，统摄升降" }
-    };
-
-    /* =====================================================
-       [行 430] 三大专项：妇科 / 男性科 / 老年病科（叠加规则）
-       ===================================================== */
-    // 命中专项关键词时，额外叠加加点与说明（不会取代证型，只是“加号包”）
-    const SPECIAL = [
-      {
-        name: "妇科（经期/带下/更年期）",
-        trigger: /(痛经|经痛|月经不调|提前|延后|量多|量少|闭经|带下|更年期|潮热|盗汗)/,
-        addPoints: ["三阴交","关元","子宫","中极","太冲"],
-        note: "调冲任、理肝郁；行气活血与温养相配。经期剧痛可加血海；更年期潮热偏阴虚者酌加太溪。"
-      },
-      {
-        name: "男性科（肾阳/前列腺/性功能）",
-        trigger: /(阳痿|早泄|不育|前列腺|夜尿|尿频|性欲低|滑精)/,
-        addPoints: ["关元","命门","肾俞","中极","太溪","会阴"],
-        note: "温肾固本，佐以下焦固摄；小便频数兼涩痛者，可加三阴交与水道。"
-      },
-      {
-        name: "老年病科（睡眠/便秘/关节/眩晕）",
-        trigger: /(失眠|多梦|健忘|便秘|膝痛|关节|骨关节|眩晕|耳鸣|气短|乏力|步态不稳)/,
-        addPoints: ["神门","安眠","百会","天枢","大肠俞","膝眼","阳陵泉","风池","太冲"],
-        note: "宁神、通便、舒筋与清窍并举；个别患者体虚不耐久灸，时长与强度宜从轻到中。"
-      }
-    ];
-
-    /* =====================================================
-       [行 470] 打分引擎 + 强度自动微调 + 专项叠加
-       ===================================================== */
-    function scoreAndSuggest(v){
-      // 1) 文本池
-      const raw = [v.chief, v.feel, v.digestion, v.limbTemp, v.thirst, v.tongue, v.other, v.menses].join(" ");
-      const text = (raw || "").toLowerCase().replace(/\u00A0/g, " ");
-
-      // 2) 紧急禁灸（出现即返回）
-      const redFlags = ["胸痛","呼吸困难","高热","晕厥","严重出血"];
-      for (const rf of redFlags){
-        if (text.includes(rf.toLowerCase())){
-          return {
-            main:null, second:null, mixed:false,
-            primary:[], secondary:[], assist:[],
-            intensity:"禁灸", timePerPointMin:0, sessionMinutes:0,
-            frequency:"立即就医，暂停灸疗", qiLayerNote:"——",
-            note:`出现紧急信号（${rf}），请第一时间就医。`,
-            specials:[]
-          };
-        }
-      }
-
-      // 3) 证型打分
-      const scores = {};
-      Object.keys(RULES).forEach(key=>{
-        let s = 0; const r = RULES[key];
-        r.keys.forEach(kw=>{ if (text.includes(kw.toLowerCase())) s += 1; });
-
-        // 结构化加权
-        if (key==="yangXu" && /冷|畏寒|偏冷/.test(v.limbTemp||"")) s += 1;
-        if (key==="yinXu"  && /口干|盗汗|潮热/.test((v.thirst||"") + " " + (v.other||""))) s += 1;
-        if (key==="qiZhi"  && /(胸闷|烦闷|易怒)/.test(v.feel||"")) s += 1;
-        if (key==="shiRe"  && /(口苦|苔黄|小便黄)/.test((v.tongue||"") + " " + (v.digestion||""))) s += 1;
-        if (key==="piXu"   && /(腹胀|食少|大便稀|腹泻)/.test(v.digestion||"")) s += 1;
-        if (key==="tanShi" && /(苔厚腻|痰|困重)/.test((v.tongue||"") + " " + (v.feel||""))) s += 1;
-        if (key==="xueYu"  && /(刺痛|固定痛|瘀|瘀点)/.test((v.chief||"") + " " + (v.tongue||""))) s += 1;
-        if (key==="qiXueLiangXu" && /(面色萎黄|头晕|量少)/.test((v.chief||"") + " " + (v.menses||""))) s += 1;
-        if (key==="ganShenLiangXu" && /(腰膝酸软|耳鸣|脱发|多梦)/.test((v.other||"") + " " + (v.feel||""))) s += 1;
-        if (key==="weiReShiJi" && /(口臭|吞酸|灼热|大便干)/.test((v.chief||"") + " " + (v.digestion||""))) s += 1;
-
-        scores[key] = s;
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setOk(null);
+    setErr(null);
+    try {
+      if (!form.full_name) throw new Error("请填写姓名");
+      // 1) 建立/插入 customers
+      const { data: cust, error: e1 } = await supabase
+        .from("customers")
+        .insert({
+          full_name: form.full_name,
+          phone: form.phone,
+          gender: form.gender,
+          age: form.age ? Number(form.age) : null,
+        })
+        .select()
+        .single();
+      if (e1) throw e1;
+      // 2) 插入 visit 首次问诊
+      const { data: visit, error: e2 } = await supabase
+        .from("visits")
+        .insert({
+          customer_id: cust.id,
+          symptoms: form.symptoms,
+          bowel: form.bowel,
+          urine: form.urine,
+          sleep: form.sleep,
+          thirst: form.thirst,
+          tongue: form.tongue,
+          pulse: form.pulse,
+          body_feel: form.body_feel,
+          menstrual: form.menstrual,
+          notes: form.notes,
+        })
+        .select()
+        .single();
+      if (e2) throw e2;
+      setOk("提交成功，我们已收到您的资料！");
+      onSaved?.({ customerId: cust.id, visitId: visit.id });
+      setForm({
+        full_name: "",
+        phone: "",
+        gender: "",
+        age: "",
+        symptoms: "",
+        bowel: "",
+        urine: "",
+        sleep: "",
+        thirst: "",
+        tongue: "",
+        pulse: "",
+        body_feel: "",
+        menstrual: "",
+        notes: "",
       });
+    } catch (e: any) {
+      setErr(e?.message || String(e));
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
-      const sorted = Object.entries(scores).sort((a,b)=>b[1]-a[1]);
-      const [top, second] = [sorted[0], sorted[1]];
+  return (
+    <Section title="GenQi Sabah — 首诊资料表 (公共)">
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Input label="姓名*" placeholder="例如：Alex Tay" value={form.full_name} onChange={(e) => update("full_name", e.target.value)} />
+        <Input label="电话" placeholder="WhatsApp" value={form.phone} onChange={(e) => update("phone", e.target.value)} />
+        <Input label="性别" placeholder="男/女" value={form.gender} onChange={(e) => update("gender", e.target.value)} />
+        <Input label="年龄" placeholder="例如：38" value={form.age} onChange={(e) => update("age", e.target.value)} />
 
-      // 4) 基础建议（若无明显证型）
-      if (!top || top[1]===0){
-        const L = QI_LAYERS["中焦"];
-        return {
-          main:null, second:null, mixed:false,
-          primary:["中脘","关元","足三里"], secondary:["脾俞"], assist:["基础布阵，30分钟后复查"],
-          intensity:"中灸", timePerPointMin:8, sessionMinutes:25,
-          frequency:"每周 2-3 次，10-12 次为一疗程", qiLayerNote:L.note,
-          note:"无明显单一证型，建议先做中焦与下焦基础位，观察再调。",
-          specials:matchSpecials(text)
-        };
+        <Textarea label="主要症状 + 诱因（时间线、晨晚差异）" value={form.symptoms} onChange={(e) => update("symptoms", e.target.value)} />
+        <Textarea label="大便（频率/性状）" value={form.bowel} onChange={(e) => update("bowel", e.target.value)} />
+        <Textarea label="小便（频次/颜色/不尽感/气味）" value={form.urine} onChange={(e) => update("urine", e.target.value)} />
+        <Textarea label="睡眠（入睡难/夜醒点/醒后状态）" value={form.sleep} onChange={(e) => update("sleep", e.target.value)} />
+        <Textarea label="口渴/口苦/喜冷喜热" value={form.thirst} onChange={(e) => update("thirst", e.target.value)} />
+        <Textarea label="舌（色/苔/胖瘦/齿痕/润燥/舌底血管）" value={form.tongue} onChange={(e) => update("tongue", e.target.value)} />
+        <Textarea label="脉（寸关尺强弱/浮沉/数缓/涩滑）" value={form.pulse} onChange={(e) => update("pulse", e.target.value)} />
+        <Textarea label="体感（怕冷或热/汗/胸闷胀满/头晕顶闷/脚底温度）" value={form.body_feel} onChange={(e) => update("body_feel", e.target.value)} />
+        <Textarea label="月经（周期/经量/颜色/质地/伴随症状）" value={form.menstrual} onChange={(e) => update("menstrual", e.target.value)} />
+        <Textarea label="备注 / 其他" value={form.notes} onChange={(e) => update("notes", e.target.value)} />
+
+        <div className="col-span-full flex items-center gap-3">
+          <button disabled={submitting} className="rounded-xl px-4 py-2 bg-black text-white hover:opacity-90 disabled:opacity-50">
+            {submitting ? "提交中…" : "提交"}
+          </button>
+          {ok && <span className="text-green-600">{ok}</span>}
+          {err && <span className="text-red-600">{err}</span>}
+        </div>
+      </form>
+    </Section>
+  );
+}
+
+// ====== 5) Admin（店内）登录 + 搜索/查看 ======
+function AdminPanel() {
+  const [session, setSession] = useState<any>(null);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [search, setSearch] = useState("");
+  const [rows, setRows] = useState<any[]>([]);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const { data: sub } = supabase.auth.onAuthStateChange((_evt, sess) => setSession(sess));
+    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  const login = async () => {
+    setBusy(true);
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    setBusy(false);
+    if (error) alert(error.message);
+  };
+  const logout = async () => {
+    await supabase.auth.signOut();
+  };
+
+  const runSearch = async () => {
+    setBusy(true);
+    try {
+      let q = supabase.from("customers").select("*, visits(id, visit_date, symptoms, notes)").order("updated_at", { ascending: false });
+      if (search.trim()) {
+        // 简单模糊：姓名/电话
+        q = q.or(`full_name.ilike.%${search}%,phone.ilike.%${search}%`);
       }
-
-      const mainKey = top[0];
-      const secondKey = (second && (top[1]-second[1] <= 1)) ? second[0] : null;
-      const main = RULES[mainKey];
-
-      // 5) 强度按精力/压力微调
-      let intensity = main.intensity; // 可能是“浅-中灸”
-      const energy = Number(v.energy || 6);
-      const stress = String(v.stress || "中");
-      if (intensity.includes("浅-中")) intensity = (energy>=7 ? "中灸" : "浅灸");
-      if (energy <=4 && intensity==="中灸") intensity = "浅灸";
-      if (energy >=9 && intensity==="中灸" && stress==="低") intensity = "深灸";
-
-      const TIME = { "浅灸":{per:6,session:18}, "中灸":{per:8,session:25}, "深灸":{per:10,session:30} };
-      const t = TIME[intensity] || TIME["中灸"];
-
-      // 6) 气机分层提示
-      const layerKey = main.focus || "中焦";
-      const layer = QI_LAYERS[layerKey] || { note:"调和气机" };
-
-      // 7) 三大专项叠加
-      const specials = matchSpecials(text);
-
-      // 8) 合并“专项加点”（不覆盖主阵，只叠加）
-      const addFromSpecials = specials.flatMap(s => s.addPoints);
-      const mergedPrimary = Array.from(new Set([...main.base]));
-      const mergedSecondary = Array.from(new Set([...main.plus]));
-      const mergedAssist = Array.from(new Set([...main.assist, ...addFromSpecials]));
-
-      return {
-        main:mainKey, second:secondKey, mixed:!!secondKey,
-        primary:mergedPrimary, secondary:mergedSecondary, assist:mergedAssist,
-        intensity:intensity, timePerPointMin:t.per, sessionMinutes:t.session,
-        frequency:"每周 2-3 次，10-12 次为一疗程；缓解后维持 1 次/周",
-        qiLayerNote: layer.note,
-        note: secondKey ? `主：${cnCode(mainKey)}；兼：${cnCode(secondKey)}。可兼顾兼证要点。`
-                        : `以 ${cnCode(mainKey)} 为主进行灸疗。`,
-        specials
-      };
+      const { data, error } = await q.limit(100);
+      if (error) throw error;
+      setRows(data || []);
+    } catch (e: any) {
+      alert(e.message || String(e));
+    } finally {
+      setBusy(false);
     }
+  };
 
-    // 专项匹配函数
-    function matchSpecials(text){
-      const out = [];
-      for (const sp of SPECIAL){
-        if (sp.trigger.test(text)){
-          out.push({ name: sp.name, addPoints: sp.addPoints, note: sp.note });
-        }
-      }
-      return out;
-    }
+  const [newVisit, setNewVisit] = useState({ symptoms: "", notes: "" });
+  const addVisit = async (customerId: string) => {
+    if (!newVisit.symptoms && !newVisit.notes) return;
+    const { error } = await supabase.from("visits").insert({ customer_id: customerId, symptoms: newVisit.symptoms, notes: newVisit.notes });
+    if (error) return alert(error.message);
+    setNewVisit({ symptoms: "", notes: "" });
+    runSearch();
+  };
 
-    /* =====================================================
-       [行 560] 组装发送文本（彻底中文化 + 专项说明）
-       ===================================================== */
-    function buildMessage(){
-      const v = {
-        name:   $("#name").value.trim(),
-        chief:  $("#chief").value.trim(),
-        energy: $("#energy").value.trim(),
-        feel:   $("#feel").value,
-        sleep:  $("#sleep").value,
-        stress: $("#stress").value,
-        digestion: $("#digestion").value,
-        limbTemp: $("#limbTemp").value,
-        thirst:  $("#thirst").value,
-        menses:  $("#menses").value,
-        tongue:  $("#tongue").value.trim(),
-        other:   $("#other").value.trim()
-      };
+  if (!session) {
+    return (
+      <Section title="Admin 登录（店员使用）">
+        <div className="max-w-md">
+          <Input label="邮箱" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="admin@sabah.genqi.vip" />
+          <Input label="密码" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
+          <button onClick={login} disabled={busy} className="rounded-xl px-4 py-2 bg-black text-white hover:opacity-90 disabled:opacity-50">{busy ? "登录中…" : "登录"}</button>
+        </div>
+      </Section>
+    );
+  }
 
-      const tip = scoreAndSuggest(v);
-      const zhPattern = formatPattern(tip.main, tip.second);
-
-      // 专项说明拼接
-      let specialTxt = "";
-      if (tip.specials && tip.specials.length){
-        const rows = tip.specials.map(s => `• ${s.name}：加点 ${s.addPoints.join("、")}；要点：${s.note}`);
-        specialTxt = `\n专项叠加：\n${rows.join("\n")}`;
-      }
-
-      const sys = `【系统建议】
-证型：${zhPattern}
-灸法：${tip.intensity}
-基础位：${(tip.primary && tip.primary.length) ? tip.primary.join("、") : "—"}
-强化位：${(tip.secondary && tip.secondary.length) ? tip.secondary.join("、") : "—"}
-辅助：${(tip.assist && tip.assist.length) ? tip.assist.join("、") : "—"}
-时长：每穴约 ${tip.timePerPointMin} 分钟；单次 ${tip.sessionMinutes} 分钟
-频次：${tip.frequency}
-气机分层：${tip.qiLayerNote}
-说明：${tip.note}${specialTxt}`;
-
-      return `
-客户信息：
-姓名/编号：${v.name || "未填"}
-主诉：${v.chief || "未填"}
-精力：${v.energy || "—"}/10；睡眠：${v.sleep || "—"}h；压力：${v.stress || "—"}
-体感：${v.feel || "—"}；消化：${v.digestion || "—"}
-手脚温：${v.limbTemp || "—"}；饮水：${v.thirst || "—"}；经期：${v.menses || "—"}
-舌/皮肤等：${v.tongue || "—"}
-补充：${v.other || "—"}
-
-${sys}
-`.trim();
-    }
-/* =====================================================
-       [行 410] 起火-布火-收火 流程模板（随焦域与强度微调）
-       ===================================================== */
-    const FIRE_FLOW = {
-      "上焦":  { start:["百会","膻中"],        main:["中脘","太冲"],            close:["太溪","涌泉"] },
-      "中焦":  { start:["中脘","天枢"],        main:["关元","足三里","脾俞"],    close:["涌泉","太溪"] },
-      "下焦":  { start:["关元","气海"],        main:["命门","肾俞","中极"],      close:["太溪","涌泉"] },
-      "中上焦":{ start:["膻中"],              main:["丰隆","阴陵泉","中脘"],    close:["内关","太溪"] },
-      "上中焦":{ start:["膻中","太冲"],        main:["血海","膈俞"],            close:["内关","涌泉"] },
-      "中下焦":{ start:["中脘","关元"],        main:["气海","足三里","脾俞"],    close:["太溪","关元"] }
-    };
-
-    function fireFlowBy(tip){
-      // 选择焦域模板
-      const layerKey = tip?.qiLayerNote?.includes("上") && !tip?.qiLayerNote?.includes("下") ? "上焦"
-                    : tip?.qiLayerNote?.includes("下") && !tip?.qiLayerNote?.includes("上") ? "下焦"
-                    : tip?.qiLayerNote?.includes("上中") ? "上中焦"
-                    : tip?.qiLayerNote?.includes("中上") ? "中上焦"
-                    : tip?.qiLayerNote?.includes("中下") ? "中下焦"
-                    : "中焦";
-      const tpl = FIRE_FLOW[layerKey] || FIRE_FLOW["中焦"];
-
-      // 强度→分段时长微调
-      const I = tip.intensity || "中灸";
-      const per = (I==="浅灸") ? {start:5, main:6, close:4}
-               : (I==="深灸") ? {start:6, main:10, close:5}
-               :                 {start:5, main:8,  close:4};
-
-      return {
-        start: tpl.start, startMin: per.start,
-        main:  tpl.main.length ? tpl.main : (tip.primary || []), mainMin: per.main,
-        close: tpl.close, closeMin: per.close
-      };
-    }
-  // =====================================================
-// 发送与清空（WhatsApp 发送）
-// =====================================================
-btn.addEventListener("click", () => {
-  const msg = buildMessage(); // 在 buildMessage 里完成辩证 + 拼装
-   const tip  = scoreAndSuggest(v);    // 专业辩证
-  const zhPattern = cn(tip.pattern);  // 英文枚举转中文
-  const flow = fireFlowBy(tip);       // 起火/布火/收火
-
-  const sys = `【系统建议】
-证型：${zhPattern}
-灸法：${tip.intensity}
-基础位：${(tip.primary && tip.primary.length) ? tip.primary.join("、") : "—"}
-强化位：${(tip.secondary && tip.secondary.length) ? tip.secondary.join("、") : "—"}
-辅助：${(tip.assist && tip.assist.length) ? tip.assist.join("、") : "—"}
-时长：每穴约 ${tip.timePerPointMin} 分钟；单次 ${tip.sessionMinutes} 分钟
-频次：${tip.frequency}
-气机分层：${tip.qiLayerNote}
-—— 起火 · 布火 · 收火 ——
-起火（开门引阳）：${flow.start.join("、")}（每穴约 ${flow.startMin} 分）
-布火（主战位）：${flow.main.join("、")}（每穴约 ${flow.mainMin} 分）
-收火（归根固摄）：${flow.close.join("、")}（每穴约 ${flow.closeMin} 分）
-说明：${tip.note}` +
-  ((tip.specials && tip.specials.length)
-    ? `\n专项叠加：\n${tip.specials.map(s => `• ${s.name}：加点 ${s.addPoints.join("、")}；要点：${s.note}`).join("\n")}`
-    : "");
-    resetBtn.addEventListener("click", () => {
-      document.querySelectorAll("input,select,textarea").forEach(el => {
-        if (el.id === "energy") el.value = 6;
-        else if (el.id === "sleep") el.value = 7;
-        else if (el.tagName === "SELECT") el.selectedIndex = 0;
-        else el.value = "";
-      });
-      notice.style.display = "none";
-    });
-  </script>
-  <div class="gq-wrap">
-  <!-- 封面（Hero） -->
-  <section class="gq-hero" id="gq-hero">
-    <div class="gq-logo">Qi</div>
-    <div>
-      <h1>GenQi Pro · 艾灸馆智能接诊系统</h1>
-      <div class="sub">门店私域接诊 · 表单数据直达店长/店员 · 支持后续辩证与起火/布火/收火</div>
-      <div class="gq-cta">
-        <button class="gq-btn" onclick="document.getElementById('gq-form').scrollIntoView({behavior:'smooth'})">开始录入</button>
-        <button class="gq-btn ghost" onclick="location.href='#gq-form'">直接定位表单</button>
+  return (
+    <Section title="顾客档案（可查询 / 可追踪）">
+      <div className="flex items-center gap-3 mb-4">
+        <Input placeholder="搜索姓名或电话…" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <button onClick={runSearch} className="rounded-xl px-4 py-2 bg-black text-white">查询</button>
+        <button onClick={logout} className="rounded-xl px-4 py-2 border">退出</button>
       </div>
-    </div>
-  </section>
+      <div className="grid gap-4">
+        {rows.map((c) => (
+          <div key={c.id} className="border rounded-xl p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <div className="font-semibold text-lg">{c.full_name} <span className="text-sm text-gray-500">#{c.id.slice(0,8)}</span></div>
+                <div className="text-sm text-gray-600">{c.phone} • {c.gender || "-"} • {c.age ? `${c.age}岁` : "年龄-"}</div>
+              </div>
+              <div className="text-xs text-gray-500">建档：{new Date(c.created_at).toLocaleString()}</div>
+            </div>
 
-  <!-- 接诊表单卡片（挂载点 renderForm 会渲染字段） -->
-  <section class="gq-card" id="gq-form">
-    <h3 style="margin-top:0">📝 客户症状录入表</h3>
-    <div id="gq-form-mount" class="gq-grid"></div>
-    <div class="gq-actions">
-      <!-- 注意：保持 send/reset 这两个 ID，不影响你现有的 WhatsApp 发送逻辑 -->
-      <button id="send" class="gq-btn">提交至门店</button>
-      <button id="reset" class="gq-btn ghost" type="button">清空</button>
+            <div className="mt-3">
+              <div className="text-sm font-medium mb-1">新增回访记录</div>
+              <div className="grid md:grid-cols-2 gap-2">
+                <Textarea placeholder="本次症状/主诉…" value={newVisit.symptoms} onChange={(e) => setNewVisit((s) => ({ ...s, symptoms: e.target.value }))} />
+                <Textarea placeholder="治疗/方剂/艾灸/饮食/备注…" value={newVisit.notes} onChange={(e) => setNewVisit((s) => ({ ...s, notes: e.target.value }))} />
+              </div>
+              <button onClick={() => addVisit(c.id)} className="mt-2 rounded-xl px-3 py-1.5 bg-black text-white">保存回访</button>
+            </div>
+
+            <div className="mt-4">
+              <div className="text-sm font-medium mb-1">历史就诊</div>
+              <div className="grid gap-2">
+                {(c.visits || []).map((v: any) => (
+                  <div key={v.id} className="rounded-lg border p-3 text-sm">
+                    <div className="text-gray-600">{v.visit_date} • 记录#{v.id.slice(0,6)}</div>
+                    {v.symptoms && <div className="mt-1"><span className="font-medium">症状：</span>{v.symptoms}</div>}
+                    {v.notes && <div className="mt-1"><span className="font-medium">备注：</span>{v.notes}</div>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Section>
+  );
+}
+
+// ====== 6) 文件上传（舌象/脉象）演示组件 ======
+function UploadDemo() {
+  const [file, setFile] = useState<File | null>(null);
+  const [url, setUrl] = useState<string | null>(null);
+  const [customerId, setCustomerId] = useState("");
+
+  const upload = async () => {
+    if (!file || !customerId) return alert("请选择客户并选择图片");
+    const ext = file.name.split(".").pop();
+    const path = `${customerId}/${Date.now()}.${ext}`;
+    const { error } = await supabase.storage.from("uploads").upload(path, file, { upsert: true });
+    if (error) return alert(error.message);
+    const { data } = supabase.storage.from("uploads").getPublicUrl(path);
+    setUrl(data.publicUrl);
+  };
+
+  return (
+    <Section title="图片上传（舌象/脉象/报告）">
+      <div className="grid md:grid-cols-3 gap-3 items-end">
+        <Input label="顾客ID" placeholder="粘贴 customers.id" value={customerId} onChange={(e) => setCustomerId(e.target.value)} />
+        <input type="file" accept="image/*" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+        <button onClick={upload} className="rounded-xl px-4 py-2 bg-black text-white">上传</button>
+      </div>
+      {url && (
+        <div className="mt-3">
+          <div className="text-sm text-gray-600">Public URL：</div>
+          <a className="text-blue-600 underline" href={url} target="_blank" rel="noreferrer">{url}</a>
+          <div className="mt-2"><img src={url} alt="preview" className="max-h-64 rounded-xl border" /></div>
+        </div>
+      )}
+    </Section>
+  );
+}
+
+// ====== 7) 顶层 App ======
+export default function App() {
+  const [tab, setTab] = useState<'intake' | 'admin' | 'upload'>('intake');
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 text-gray-900 p-6 md:p-10">
+      <header className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div>
+          <div className="text-2xl font-bold">GenQi · Sabah 门店系统</div>
+          <div className="text-sm text-gray-600">www.genqi.vip • sabah.genqi.vip</div>
+        </div>
+        <nav className="flex items-center gap-2">
+          <button onClick={() => setTab('intake')} className={`px-4 py-2 rounded-xl border ${tab==='intake' ? 'bg-black text-white' : ''}`}>问诊表</button>
+          <button onClick={() => setTab('admin')} className={`px-4 py-2 rounded-xl border ${tab==='admin' ? 'bg-black text-white' : ''}`}>Admin</button>
+          <button onClick={() => setTab('upload')} className={`px-4 py-2 rounded-xl border ${tab==='upload' ? 'bg-black text-white' : ''}`}>上传</button>
+        </nav>
+      </header>
+
+      <main className="max-w-6xl mx-auto">
+        {tab === 'intake' && <IntakeForm />}
+        {tab === 'admin' && <AdminPanel />}
+        {tab === 'upload' && <UploadDemo />}
+      </main>
+
+      <footer className="mt-12 text-center text-xs text-gray-500">
+        © {new Date().getFullYear()} GenQi. All rights reserved.
+      </footer>
     </div>
-  </section>
-</div> 
-</body>
-</html>
+  );
+}
